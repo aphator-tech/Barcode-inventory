@@ -1,0 +1,6 @@
+{
+  "name": "Barcode Inventory Management System",
+  "description": "Professional clothing and fashion inventory manager with real-time stock tracking, variant matrix support, barcode auto-generation, labels printing, and a POS module.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
