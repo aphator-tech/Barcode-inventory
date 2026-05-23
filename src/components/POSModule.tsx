@@ -257,9 +257,9 @@ export const POSModule: React.FC<POSProps> = ({
               placeholder="Search by SKU, Barcode, Name, Category, or Brand [Esc to clear]"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              className="w-full text-sm py-3.5 pl-11 pr-11 bg-gray-50 dark:bg-gray-950/60 border border-gray-200/80 dark:border-gray-850 rounded-2xl focus:outline-hidden focus:ring-2 focus:ring-teal-500 focus:bg-white text-gray-900 dark:text-white transition-all font-medium"
+              className="w-full text-sm py-3.5 pl-11 pr-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl focus:outline-hidden focus:ring-2 focus:ring-teal-500 focus:bg-white text-slate-900 dark:text-slate-100 transition-all font-medium"
             />
-            <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-gray-400" />
+            <Search className="absolute left-4 top-3.5 w-4.5 h-4.5 text-slate-400 dark:text-slate-500" />
             {searchText && (
               <button 
                 onClick={() => setSearchText('')}
@@ -271,7 +271,7 @@ export const POSModule: React.FC<POSProps> = ({
 
             {/* Quick Picker Dropdown Menu */}
             {filteredSearchList.length > 0 && (
-              <div className="absolute left-0 right-0 top-14 bg-white dark:bg-gray-905 border border-gray-100 dark:border-gray-800 rounded-2xl shadow-xl z-30 max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-850 p-2 text-left">
+              <div className="absolute left-0 right-0 top-14 bg-white dark:bg-slate-950 border border-slate-250 dark:border-slate-800 rounded-2xl shadow-xl z-30 max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800 p-2 text-left">
                 {filteredSearchList.map(v => {
                   const prod = products.find(p => p.id === v.productId);
                   if (!prod) return null;
@@ -471,7 +471,7 @@ export const POSModule: React.FC<POSProps> = ({
           {/* Discounts Flat & Tax Rate adjusting selectors */}
           <div className="space-y-4 pt-1">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Flat Campaign Discount ($)</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Flat Campaign Discount ($)</label>
               <div className="relative">
                 <input
                   type="number"
@@ -480,15 +480,15 @@ export const POSModule: React.FC<POSProps> = ({
                   placeholder="0.00"
                   value={flatDiscount || ''}
                   onChange={(e) => setFlatDiscount(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl font-mono font-bold"
+                  className="w-full pl-8 pr-3 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
-                <DollarSign className="absolute left-3 top-3 w-3.5 h-3.5 text-gray-400" />
+                <DollarSign className="absolute left-3 top-3 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Sales Tax Rate (%)</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Sales Tax Rate (%)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -496,18 +496,18 @@ export const POSModule: React.FC<POSProps> = ({
                     placeholder="8"
                     value={taxRate * 100}
                     onChange={(e) => setTaxRate((parseFloat(e.target.value) || 0) / 100)}
-                    className="w-full pl-3 pr-8 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl font-mono font-bold"
+                    className="w-full pl-3 pr-8 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
-                  <Percent className="absolute right-3 top-3 w-3.5 h-3.5 text-gray-400" />
+                  <Percent className="absolute right-3 top-3 w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">POS Method</label>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">POS Method</label>
                 <select
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-100 rounded-xl font-bold text-gray-700 focus:outline-hidden"
+                  className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-hidden"
                 >
                   <option value="Card">💳 Credit Card</option>
                   <option value="Cash">💵 Cash In Hand</option>
@@ -518,13 +518,13 @@ export const POSModule: React.FC<POSProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Receipt Memo (Optional)</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Receipt Memo (Optional)</label>
               <textarea
                 placeholder="Walk-in checkout note..."
                 rows={2}
                 value={sessionNotes}
                 onChange={(e) => setSessionNotes(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-gray-50 border border-gray-100 rounded-xl text-gray-700 resize-none"
+                className="w-full px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-950 dark:text-slate-100 resize-none placeholder-slate-400 dark:placeholder-slate-600 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
               />
             </div>
           </div>

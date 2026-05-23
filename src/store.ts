@@ -3,8 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Product, Variant, Supplier, TransactionType, Transaction, ScanLog, CartItem, InventoryStats } from './types';
+import { 
+  GSheetConnectionState, 
+  findNorseThreadSpreadsheet, 
+  createNorseThreadSpreadsheet, 
+  pushDataToGoogleSheets, 
+  pullDataFromGoogleSheets 
+} from './lib/gsheet';
 
 // Web Audio Synth for professional retail scanner sound effects
 export const playScannerSound = (type: 'success' | 'error' | 'click') => {
@@ -119,32 +126,23 @@ const INITIAL_PRODUCTS: Product[] = [
 
 // Initial Variants
 const INITIAL_VARIANTS: Variant[] = [
-  // Product 1: Nordic Heritage Wool Sweater
   { id: 'var1_1', productId: 'prod1', size: 'S', color: '#eae5d9', colorName: 'Chalk Oatmeal', barcode: '1019011', sku: 'NT-NWS-CO-S', currentStock: 18, minimumStockAlert: 5, purchasePrice: 42.00, sellingPrice: 95.00, supplierId: 'sup2', storageLocation: 'Aisle 2, Bin A-3' },
   { id: 'var1_2', productId: 'prod1', size: 'M', color: '#eae5d9', colorName: 'Chalk Oatmeal', barcode: '1019012', sku: 'NT-NWS-CO-M', currentStock: 22, minimumStockAlert: 5, purchasePrice: 42.00, sellingPrice: 95.00, supplierId: 'sup2', storageLocation: 'Aisle 2, Bin A-3' },
   { id: 'var1_3', productId: 'prod1', size: 'L', color: '#eae5d9', colorName: 'Chalk Oatmeal', barcode: '1019013', sku: 'NT-NWS-CO-L', currentStock: 4, minimumStockAlert: 5, purchasePrice: 42.00, sellingPrice: 95.00, supplierId: 'sup2', storageLocation: 'Aisle 2, Bin A-4' },
   { id: 'var1_4', productId: 'prod1', size: 'M', color: '#1a2b3c', colorName: 'Navy Dusk', barcode: '1019022', sku: 'NT-NWS-ND-M', currentStock: 12, minimumStockAlert: 5, purchasePrice: 42.00, sellingPrice: 95.00, supplierId: 'sup2', storageLocation: 'Aisle 2, Bin B-1' },
   { id: 'var1_5', productId: 'prod1', size: 'L', color: '#1a2b3c', colorName: 'Navy Dusk', barcode: '1019023', sku: 'NT-NWS-ND-L', currentStock: 15, minimumStockAlert: 5, purchasePrice: 42.00, sellingPrice: 95.00, supplierId: 'sup2', storageLocation: 'Aisle 2, Bin B-1' },
-
-  // Product 2: Classic Urban Slim Chinos
   { id: 'var2_1', productId: 'prod2', size: 'M', color: '#3c352a', colorName: 'Raw Umber', barcode: '2023012', sku: 'MS-CCC-RU-M', currentStock: 25, minimumStockAlert: 8, purchasePrice: 20.00, sellingPrice: 59.00, supplierId: 'sup1', storageLocation: 'Aisle 1, Bin D-12' },
   { id: 'var2_2', productId: 'prod2', size: 'L', color: '#3c352a', colorName: 'Raw Umber', barcode: '2023013', sku: 'MS-CCC-RU-L', currentStock: 30, minimumStockAlert: 8, purchasePrice: 20.00, sellingPrice: 59.00, supplierId: 'sup1', storageLocation: 'Aisle 1, Bin D-12' },
   { id: 'var2_3', productId: 'prod2', size: 'M', color: '#1f2937', colorName: 'Charcoal Black', barcode: '2023022', sku: 'MS-CCC-CB-M', currentStock: 2, minimumStockAlert: 8, purchasePrice: 20.00, sellingPrice: 59.00, supplierId: 'sup1', storageLocation: 'Aisle 1, Bin D-13' },
   { id: 'var2_4', productId: 'prod2', size: 'L', color: '#1f2937', colorName: 'Charcoal Black', barcode: '2023023', sku: 'MS-CCC-CB-L', currentStock: 14, minimumStockAlert: 8, purchasePrice: 20.00, sellingPrice: 59.00, supplierId: 'sup1', storageLocation: 'Aisle 1, Bin D-13' },
-
-  // Product 3: Minimalist Breezy V-Neck Tee
   { id: 'var3_1', productId: 'prod3', size: 'S', color: '#fcf8f2', colorName: 'Natural Eggshell', barcode: '3045011', sku: 'ZW-MBT-NE-S', currentStock: 40, minimumStockAlert: 10, purchasePrice: 11.50, sellingPrice: 32.00, supplierId: 'sup3', storageLocation: 'Aisle 3, Shelf A' },
   { id: 'var3_2', productId: 'prod3', size: 'M', color: '#fcf8f2', colorName: 'Natural Eggshell', barcode: '3045012', sku: 'ZW-MBT-NE-M', currentStock: 45, minimumStockAlert: 10, purchasePrice: 11.50, sellingPrice: 32.00, supplierId: 'sup3', storageLocation: 'Aisle 3, Shelf A' },
   { id: 'var3_3', productId: 'prod3', size: 'L', color: '#fcf8f2', colorName: 'Natural Eggshell', barcode: '3045013', sku: 'ZW-MBT-NE-L', currentStock: 35, minimumStockAlert: 10, purchasePrice: 11.50, sellingPrice: 32.00, supplierId: 'sup3', storageLocation: 'Aisle 3, Shelf A' },
   { id: 'var3_4', productId: 'prod3', size: 'S', color: '#5a6258', colorName: 'Sage Leaf', barcode: '3045021', sku: 'ZW-MBT-SL-S', currentStock: 1, minimumStockAlert: 10, purchasePrice: 12.00, sellingPrice: 34.00, supplierId: 'sup3', storageLocation: 'Aisle 3, Shelf B' },
   { id: 'var3_5', productId: 'prod3', size: 'M', color: '#5a6258', colorName: 'Sage Leaf', barcode: '3045022', sku: 'ZW-MBT-SL-M', currentStock: 18, minimumStockAlert: 10, purchasePrice: 12.00, sellingPrice: 34.00, supplierId: 'sup3', storageLocation: 'Aisle 3, Shelf B' },
-
-  // Product 4: Technical Field Shell
   { id: 'var4_1', productId: 'prod4', size: 'S', color: '#273c33', colorName: 'Forest Forest', barcode: '4081011', sku: 'NT-MFS-FF-S', currentStock: 10, minimumStockAlert: 3, purchasePrice: 65.00, sellingPrice: 149.00, supplierId: 'sup2', storageLocation: 'Aisle 4, Shelf C' },
   { id: 'var4_2', productId: 'prod4', size: 'M', color: '#273c33', colorName: 'Forest Forest', barcode: '4081012', sku: 'NT-MFS-FF-M', currentStock: 12, minimumStockAlert: 3, purchasePrice: 65.00, sellingPrice: 149.00, supplierId: 'sup2', storageLocation: 'Aisle 4, Shelf C' },
   { id: 'var4_3', productId: 'prod4', size: 'L', color: '#273c33', colorName: 'Forest Forest', barcode: '4081013', sku: 'NT-MFS-FF-L', currentStock: 3, minimumStockAlert: 3, purchasePrice: 65.00, sellingPrice: 149.00, supplierId: 'sup2', storageLocation: 'Aisle 4, Shelf C' },
-
-  // Product 5: Everyday joggers
   { id: 'var5_1', productId: 'prod5', size: 'M', color: '#7f7f7f', colorName: 'Heather Grey', barcode: '5092012', sku: 'MS-EARJ-HG-M', currentStock: 30, minimumStockAlert: 8, purchasePrice: 15.00, sellingPrice: 45.00, supplierId: 'sup1', storageLocation: 'Aisle 5, Shelf A' },
   { id: 'var5_2', productId: 'prod5', size: 'L', color: '#7f7f7f', colorName: 'Heather Grey', barcode: '5092013', sku: 'MS-EARJ-HG-L', currentStock: 25, minimumStockAlert: 8, purchasePrice: 15.00, sellingPrice: 45.00, supplierId: 'sup1', storageLocation: 'Aisle 5, Shelf A' }
 ];
@@ -179,40 +177,12 @@ const INITIAL_TRANSACTIONS: Transaction[] = [
     subtotal: 420.00,
     grandTotal: 420.00,
     notes: 'Warehouse shipment receive elite cargo'
-  },
-  {
-    id: 'tr_10930',
-    timestamp: '2026-05-23T08:11:00Z',
-    type: 'SALE',
-    items: [
-      { variantId: 'var3_2', productName: 'Minimalist Breezy V-Neck Tee', variantDetails: 'M / Natural Eggshell', quantity: 3, unitPrice: 32.00, totalPrice: 96.00 }
-    ],
-    discount: 0,
-    tax: 7.68,
-    subtotal: 96.00,
-    grandTotal: 103.68,
-    paymentMethod: 'Mobile Pay',
-    scannedCode: '3045012'
-  },
-  {
-    id: 'tr_10931',
-    timestamp: '2026-05-23T10:05:00Z',
-    type: 'DAMAGED',
-    items: [
-      { variantId: 'var4_3', productName: 'Modular Commuter Field Shell', variantDetails: 'L / Forest Forest', quantity: 1, unitPrice: 65.00, totalPrice: 65.00 }
-    ],
-    discount: 0,
-    tax: 0,
-    subtotal: 65.00,
-    grandTotal: 65.00,
-    notes: 'Water stain on hanger, written off'
   }
 ];
 
 const INITIAL_SCAN_LOGS: ScanLog[] = [
   { id: 'sc_1', timestamp: '2026-05-23T10:50:00Z', barcode: '1019012', status: 'FOUND', variantId: 'var1_2', actionTaken: 'View details on dashboard' },
-  { id: 'sc_2', timestamp: '2026-05-23T11:15:20Z', barcode: '3045021', status: 'FOUND', variantId: 'var3_4', actionTaken: 'Added to POS cart' },
-  { id: 'sc_3', timestamp: '2026-05-23T11:22:11Z', barcode: '99999999', status: 'NOT_FOUND', actionTaken: 'Scanned tag unknown barcode search' }
+  { id: 'sc_2', timestamp: '2026-05-23T11:15:20Z', barcode: '3045021', status: 'FOUND', variantId: 'var3_4', actionTaken: 'Added to POS cart' }
 ];
 
 export const useInventoryState = () => {
@@ -221,6 +191,19 @@ export const useInventoryState = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [scanLogs, setScanLogs] = useState<ScanLog[]>([]);
+  
+  // Real-time server and sheet states
+  const [serverStatus, setServerStatus] = useState<'loading' | 'online' | 'local_fallback'>('loading');
+  const [googleToken, setGoogleToken] = useState<string | null>(() => localStorage.getItem('barinv_google_token'));
+  const [gsheetState, setGSheetState] = useState<GSheetConnectionState>({
+    spreadsheetId: localStorage.getItem('barinv_spreadsheet_id'),
+    spreadsheetUrl: localStorage.getItem('barinv_spreadsheet_url'),
+    isSyncing: false,
+    lastSynced: localStorage.getItem('barinv_last_synced'),
+    error: null,
+    liveSyncEnabled: localStorage.getItem('barinv_gsheet_live') === 'true'
+  });
+
   const [stats, setStats] = useState<InventoryStats>({
     totalProducts: 0,
     totalVariants: 0,
@@ -233,35 +216,58 @@ export const useInventoryState = () => {
     recentSalesCount: 0
   });
 
-  // Load from local storage or set defaults
-  useEffect(() => {
-    const rawProds = localStorage.getItem('barinv_products');
-    const rawVars = localStorage.getItem('barinv_variants');
-    const rawSups = localStorage.getItem('barinv_suppliers');
-    const rawTrans = localStorage.getItem('barinv_transactions');
-    const rawScans = localStorage.getItem('barinv_scanlogs');
+  // Load from database server (fallback to localStorage on connection issues)
+  const fetchFromServer = useCallback(async () => {
+    setServerStatus('loading');
+    try {
+      const res = await fetch('/api/db/load');
+      if (res.ok) {
+        const data = await res.json();
+        setProducts(data.products || []);
+        setVariants(data.variants || []);
+        setSuppliers(data.suppliers || []);
+        setTransactions(data.transactions || []);
+        setScanLogs(data.scanLogs || []);
+        setServerStatus('online');
+      } else {
+        throw new Error('Server returned non-200');
+      }
+    } catch (err) {
+      console.warn('Falling back to browser storage sync:', err);
+      setServerStatus('local_fallback');
+      
+      const rawProds = localStorage.getItem('barinv_products');
+      const rawVars = localStorage.getItem('barinv_variants');
+      const rawSups = localStorage.getItem('barinv_suppliers');
+      const rawTrans = localStorage.getItem('barinv_transactions');
+      const rawScans = localStorage.getItem('barinv_scanlogs');
 
-    if (rawProds && rawVars && rawSups) {
-      setProducts(JSON.parse(rawProds));
-      setVariants(JSON.parse(rawVars));
-      setSuppliers(JSON.parse(rawSups));
-      setTransactions(rawTrans ? JSON.parse(rawTrans) : []);
-      setScanLogs(rawScans ? JSON.parse(rawScans) : []);
-    } else {
-      // Seed initial data
-      localStorage.setItem('barinv_products', JSON.stringify(INITIAL_PRODUCTS));
-      localStorage.setItem('barinv_variants', JSON.stringify(INITIAL_VARIANTS));
-      localStorage.setItem('barinv_suppliers', JSON.stringify(INITIAL_SUPPLIERS));
-      localStorage.setItem('barinv_transactions', JSON.stringify(INITIAL_TRANSACTIONS));
-      localStorage.setItem('barinv_scanlogs', JSON.stringify(INITIAL_SCAN_LOGS));
+      if (rawProds && rawVars && rawSups) {
+        setProducts(JSON.parse(rawProds));
+        setVariants(JSON.parse(rawVars));
+        setSuppliers(JSON.parse(rawSups));
+        setTransactions(rawTrans ? JSON.parse(rawTrans) : []);
+        setScanLogs(rawScans ? JSON.parse(rawScans) : []);
+      } else {
+        // First boot seeding
+        setProducts(INITIAL_PRODUCTS);
+        setVariants(INITIAL_VARIANTS);
+        setSuppliers(INITIAL_SUPPLIERS);
+        setTransactions(INITIAL_TRANSACTIONS);
+        setScanLogs(INITIAL_SCAN_LOGS);
 
-      setProducts(INITIAL_PRODUCTS);
-      setVariants(INITIAL_VARIANTS);
-      setSuppliers(INITIAL_SUPPLIERS);
-      setTransactions(INITIAL_TRANSACTIONS);
-      setScanLogs(INITIAL_SCAN_LOGS);
+        localStorage.setItem('barinv_products', JSON.stringify(INITIAL_PRODUCTS));
+        localStorage.setItem('barinv_variants', JSON.stringify(INITIAL_VARIANTS));
+        localStorage.setItem('barinv_suppliers', JSON.stringify(INITIAL_SUPPLIERS));
+        localStorage.setItem('barinv_transactions', JSON.stringify(INITIAL_TRANSACTIONS));
+        localStorage.setItem('barinv_scanlogs', JSON.stringify(INITIAL_SCAN_LOGS));
+      }
     }
   }, []);
+
+  useEffect(() => {
+    fetchFromServer();
+  }, [fetchFromServer]);
 
   // Recalculate statistics when core data changes
   useEffect(() => {
@@ -281,8 +287,6 @@ export const useInventoryState = () => {
       }
     });
 
-    // Calculate sales based on transaction logs (SALE index within last periods)
-    // For safety, let's treat the date 2026-05-23 as "today" because of mock bounds
     const parseDateISO = (isoStr: string) => new Date(isoStr).getTime();
     const todayTimestamp = parseDateISO('2026-05-23T11:46:26Z');
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -320,21 +324,214 @@ export const useInventoryState = () => {
     });
   }, [products, variants, transactions]);
 
-  const saveToLocalStorage = (
+  // Unified save engine: LocalStorage + Server Node API + Google Sheets Live Sync
+  const saveDataState = useCallback(async (
     prods: Product[],
     vars: Variant[],
     sups: Supplier[],
     trans: Transaction[],
     scans: ScanLog[]
   ) => {
+    // 1. LocalStorage
     localStorage.setItem('barinv_products', JSON.stringify(prods));
     localStorage.setItem('barinv_variants', JSON.stringify(vars));
     localStorage.setItem('barinv_suppliers', JSON.stringify(sups));
     localStorage.setItem('barinv_transactions', JSON.stringify(trans));
     localStorage.setItem('barinv_scanlogs', JSON.stringify(scans));
+
+    // 2. Server Node Storage
+    try {
+      const res = await fetch('/api/db/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          products: prods,
+          variants: vars,
+          suppliers: sups,
+          transactions: trans,
+          scanLogs: scans
+        })
+      });
+      if (res.ok) {
+        setServerStatus('online');
+      } else {
+        setServerStatus('local_fallback');
+      }
+    } catch {
+      setServerStatus('local_fallback');
+    }
+
+    // 3. Google Sheets Auto-Sync if logged in and configured
+    const activeToken = googleToken || localStorage.getItem('barinv_google_token');
+    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
+    const isLive = gsheetState.liveSyncEnabled || localStorage.getItem('barinv_gsheet_live') === 'true';
+
+    if (isLive && activeToken && sheetId) {
+      setGSheetState(prev => ({ ...prev, isSyncing: true }));
+      try {
+        await pushDataToGoogleSheets(activeToken, sheetId, prods, vars, trans);
+        const stamp = new Date().toLocaleTimeString();
+        localStorage.setItem('barinv_last_synced', stamp);
+        setGSheetState(prev => ({
+          ...prev,
+          isSyncing: false,
+          lastSynced: stamp,
+          error: null
+        }));
+      } catch (err: any) {
+        console.error('Auto-sync failed:', err);
+        setGSheetState(prev => ({
+          ...prev,
+          isSyncing: false,
+          error: err.message || 'Auto-sync failed. Please sign in again.'
+        }));
+      }
+    }
+  }, [googleToken, gsheetState.spreadsheetId, gsheetState.liveSyncEnabled]);
+
+
+  // --- GOOGLE SHEETS ACTIONS ---
+
+  const connectGoogleSheets = async (token: string) => {
+    setGoogleToken(token);
+    localStorage.setItem('barinv_google_token', token);
+    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
+
+    try {
+      // Find or create sheet
+      let sheetId = await findNorseThreadSpreadsheet(token);
+      if (!sheetId) {
+        sheetId = await createNorseThreadSpreadsheet(token);
+      }
+
+      const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+      localStorage.setItem('barinv_spreadsheet_id', sheetId);
+      localStorage.setItem('barinv_spreadsheet_url', sheetUrl);
+      
+      // Perform initial push config
+      await pushDataToGoogleSheets(token, sheetId, products, variants, transactions);
+      
+      const stamp = new Date().toLocaleTimeString();
+      localStorage.setItem('barinv_last_synced', stamp);
+
+      setGSheetState({
+        spreadsheetId: sheetId,
+        spreadsheetUrl: sheetUrl,
+        isSyncing: false,
+        lastSynced: stamp,
+        error: null,
+        liveSyncEnabled: true
+      });
+      localStorage.setItem('barinv_gsheet_live', 'true');
+      playScannerSound('success');
+
+    } catch (err: any) {
+      console.error('Google Sheets connection failed:', err);
+      setGSheetState(prev => ({
+        ...prev,
+        isSyncing: false,
+        error: err.message || 'Connection or scope permission failed.'
+      }));
+      playScannerSound('error');
+    }
   };
 
-  // --- ACTIONS ---
+  const disconnectGoogleSheets = () => {
+    setGoogleToken(null);
+    localStorage.removeItem('barinv_google_token');
+    localStorage.removeItem('barinv_spreadsheet_id');
+    localStorage.removeItem('barinv_spreadsheet_url');
+    localStorage.removeItem('barinv_last_synced');
+    localStorage.removeItem('barinv_gsheet_live');
+
+    setGSheetState({
+      spreadsheetId: null,
+      spreadsheetUrl: null,
+      isSyncing: false,
+      lastSynced: null,
+      error: null,
+      liveSyncEnabled: false
+    });
+    playScannerSound('error');
+  };
+
+  const pushToGoogleSheets = async () => {
+    const token = googleToken || localStorage.getItem('barinv_google_token');
+    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
+    
+    if (!token || !sheetId) {
+      setGSheetState(prev => ({ ...prev, error: 'Authorization token or spreadsheet not connected.' }));
+      return;
+    }
+
+    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
+    try {
+      await pushDataToGoogleSheets(token, sheetId, products, variants, transactions);
+      const stamp = new Date().toLocaleTimeString();
+      localStorage.setItem('barinv_last_synced', stamp);
+      setGSheetState(prev => ({
+        ...prev,
+        isSyncing: false,
+        lastSynced: stamp,
+        error: null
+      }));
+      playScannerSound('success');
+    } catch (err: any) {
+      setGSheetState(prev => ({
+        ...prev,
+        isSyncing: false,
+        error: err.message || 'Push to Sheets failed.'
+      }));
+      playScannerSound('error');
+    }
+  };
+
+  const pullFromGoogleSheets = async () => {
+    const token = googleToken || localStorage.getItem('barinv_google_token');
+    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
+
+    if (!token || !sheetId) {
+      setGSheetState(prev => ({ ...prev, error: 'Google Account Connection expired.' }));
+      return;
+    }
+
+    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
+    try {
+      const pulled = await pullDataFromGoogleSheets(token, sheetId, suppliers);
+      
+      // Update states
+      setProducts(pulled.products);
+      setVariants(pulled.variants);
+      
+      await saveDataState(pulled.products, pulled.variants, suppliers, transactions, scanLogs);
+
+      const stamp = new Date().toLocaleTimeString();
+      localStorage.setItem('barinv_last_synced', stamp);
+      setGSheetState(prev => ({
+        ...prev,
+        isSyncing: false,
+        lastSynced: stamp,
+        error: null
+      }));
+      playScannerSound('success');
+    } catch (err: any) {
+      setGSheetState(prev => ({
+        ...prev,
+        isSyncing: false,
+        error: err.message || 'Failed pulling values from Google Sheets'
+      }));
+      playScannerSound('error');
+    }
+  };
+
+  const toggleLiveSync = (enabled: boolean) => {
+    setGSheetState(prev => ({ ...prev, liveSyncEnabled: enabled }));
+    localStorage.setItem('barinv_gsheet_live', enabled ? 'true' : 'false');
+    playScannerSound('click');
+  };
+
+
+  // --- PRODUCT / VARIANT ACTIONS ---
 
   // Add a new product entirely
   const addProduct = (product: Product, productVariants: Omit<Variant, 'id' | 'productId'>[]) => {
@@ -348,7 +545,7 @@ export const useInventoryState = () => {
 
     setProducts(newProds);
     setVariants(newVars);
-    saveToLocalStorage(newProds, newVars, suppliers, transactions, scanLogs);
+    saveDataState(newProds, newVars, suppliers, transactions, scanLogs);
     playScannerSound('click');
   };
 
@@ -356,20 +553,24 @@ export const useInventoryState = () => {
   const updateProductMeta = (updatedProduct: Product) => {
     const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
     setProducts(updated);
-    saveToLocalStorage(updated, variants, suppliers, transactions, scanLogs);
+    saveDataState(updated, variants, suppliers, transactions, scanLogs);
   };
 
   // Update variant information
   const updateVariant = (updatedVariant: Variant) => {
     const updated = variants.map(v => v.id === updatedVariant.id ? updatedVariant : v);
     setVariants(updated);
-    saveToLocalStorage(products, updated, suppliers, transactions, scanLogs);
+    saveDataState(products, updated, suppliers, transactions, scanLogs);
     playScannerSound('click');
   };
 
   // Quick Stock adjustment directly on variant
-  const adjustStockDirectly = (variantId: string, quantityChange: number, type: 'RESTOCK' | 'DAMAGED' | 'RETURN', reasonNote?: string) => {
-    let transType: TransactionType = type;
+  const adjustStockDirectly = (
+    variantId: string, 
+    quantityChange: number, 
+    type: 'RESTOCK' | 'DAMAGED' | 'RETURN', 
+    reasonNote?: string
+  ) => {
     const targetVariant = variants.find(v => v.id === variantId);
     if (!targetVariant) return;
 
@@ -389,14 +590,13 @@ export const useInventoryState = () => {
       return v;
     });
 
-    // Log complete transaction
     const unitPrice = type === 'RESTOCK' ? targetVariant.purchasePrice : targetVariant.sellingPrice;
     const computedTotal = Math.abs(quantityChange) * unitPrice;
     
     const newTransaction: Transaction = {
       id: `tr_${Date.now().toString().slice(-6)}`,
       timestamp: new Date().toISOString(),
-      type: transType,
+      type,
       items: [
         {
           variantId,
@@ -418,7 +618,7 @@ export const useInventoryState = () => {
 
     setVariants(updatedVars);
     setTransactions(newTrans);
-    saveToLocalStorage(products, updatedVars, suppliers, newTrans, scanLogs);
+    saveDataState(products, updatedVars, suppliers, newTrans, scanLogs);
     playScannerSound('success');
   };
 
@@ -429,7 +629,7 @@ export const useInventoryState = () => {
 
     setProducts(filteredProds);
     setVariants(filteredVars);
-    saveToLocalStorage(filteredProds, filteredVars, suppliers, transactions, scanLogs);
+    saveDataState(filteredProds, filteredVars, suppliers, transactions, scanLogs);
     playScannerSound('error');
   };
 
@@ -437,7 +637,7 @@ export const useInventoryState = () => {
   const addSupplier = (sup: Supplier) => {
     const newSups = [sup, ...suppliers];
     setSuppliers(newSups);
-    saveToLocalStorage(products, variants, newSups, transactions, scanLogs);
+    saveDataState(products, variants, newSups, transactions, scanLogs);
   };
 
   // Record a scanned log
@@ -460,11 +660,10 @@ export const useInventoryState = () => {
         : 'Unknown barcode tag input'
     };
 
-    const nextLogs = [newLog, ...scanLogs.slice(0, 49)]; // Cap scan logs
+    const nextLogs = [newLog, ...scanLogs.slice(0, 49)];
     setScanLogs(nextLogs);
     
-    const updatedTrans = [...transactions];
-    saveToLocalStorage(products, variants, suppliers, updatedTrans, nextLogs);
+    saveDataState(products, variants, suppliers, transactions, nextLogs);
 
     if (associatedVariant) {
       playScannerSound('success');
@@ -495,7 +694,6 @@ export const useInventoryState = () => {
       }
     }
 
-    // Deduct stock levels reactive logic
     const updatedVars = variants.map(v => {
       const cartMatch = cartItems.find(item => item.variant.id === v.id);
       if (cartMatch) {
@@ -507,7 +705,6 @@ export const useInventoryState = () => {
       return v;
     });
 
-    // Build the grand sales log
     let subtotal = 0;
     const itemsSnapshot = cartItems.map(item => {
       const lineTotal = item.quantity * item.variant.sellingPrice * (1 - item.discountPercentage / 100);
@@ -542,7 +739,7 @@ export const useInventoryState = () => {
     const nextTrans = [newTransaction, ...transactions];
     setVariants(updatedVars);
     setTransactions(nextTrans);
-    saveToLocalStorage(products, updatedVars, suppliers, nextTrans, scanLogs);
+    saveDataState(products, updatedVars, suppliers, nextTrans, scanLogs);
     playScannerSound('success');
 
     return newTransaction;
@@ -553,16 +750,13 @@ export const useInventoryState = () => {
     const tx = transactions.find(t => t.id === transactionId);
     if (!tx) return;
 
-    // Restore stock levels based on logs
     const updatedVars = [...variants];
     tx.items.forEach(item => {
       const vIdx = updatedVars.findIndex(v => v.id === item.variantId);
       if (vIdx !== -1) {
         if (tx.type === 'SALE' || tx.type === 'DAMAGED') {
-          // Add back
           updatedVars[vIdx].currentStock += item.quantity;
         } else if (tx.type === 'RESTOCK' || tx.type === 'RETURN') {
-          // Deduct back
           updatedVars[vIdx].currentStock = Math.max(0, updatedVars[vIdx].currentStock - item.quantity);
         }
       }
@@ -571,7 +765,7 @@ export const useInventoryState = () => {
     const nextTrans = transactions.filter(t => t.id !== transactionId);
     setVariants(updatedVars);
     setTransactions(nextTrans);
-    saveToLocalStorage(products, updatedVars, suppliers, nextTrans, scanLogs);
+    saveDataState(products, updatedVars, suppliers, nextTrans, scanLogs);
     playScannerSound('error');
   };
 
@@ -588,6 +782,7 @@ export const useInventoryState = () => {
     setSuppliers(INITIAL_SUPPLIERS);
     setTransactions(INITIAL_TRANSACTIONS);
     setScanLogs(INITIAL_SCAN_LOGS);
+    saveDataState(INITIAL_PRODUCTS, INITIAL_VARIANTS, INITIAL_SUPPLIERS, INITIAL_TRANSACTIONS, INITIAL_SCAN_LOGS);
     playScannerSound('success');
   };
 
@@ -600,10 +795,6 @@ export const useInventoryState = () => {
       const lines = csvContent.split(/\r?\n/);
       if (lines.length < 2) return { successCount: 0, errors: ['CSV file is empty or missing headers.'] };
 
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^['"]|['"]$/g, ''));
-      
-      const expectedHeaders = ['Product Name', 'Category', 'Brand', 'Size', 'Color', 'Barcode', 'SKU', 'Current Stock', 'Min Stock Alert', 'Purchase Price', 'SellingPrice'];
-      
       const nextProds = [...products];
       const nextVars = [...variants];
 
@@ -611,7 +802,6 @@ export const useInventoryState = () => {
         const line = lines[i].trim();
         if (!line) continue;
 
-        // Custom parser to handle quotes and commas safely
         const cells: string[] = [];
         let inQuotes = false;
         let currentCell = '';
@@ -647,14 +837,12 @@ export const useInventoryState = () => {
         const purchase = parseFloat(cells[10]) || 10.00;
         const selling = parseFloat(cells[11]) || 25.00;
 
-        // Check for duplicates
         const barcodeExists = nextVars.some(v => v.barcode === barcode);
         if (barcodeExists) {
           errors.push(`Row ${i + 1}: Barcode ${barcode} already in system. Skipped.`);
           continue;
         }
 
-        // Find or create product
         let product = nextProds.find(p => p.name.toLowerCase() === name.toLowerCase());
         if (!product) {
           product = {
@@ -695,7 +883,7 @@ export const useInventoryState = () => {
       if (successCount > 0) {
         setProducts(nextProds);
         setVariants(nextVars);
-        saveToLocalStorage(nextProds, nextVars, suppliers, transactions, scanLogs);
+        saveDataState(nextProds, nextVars, suppliers, transactions, scanLogs);
         playScannerSound('success');
       }
 
@@ -713,6 +901,15 @@ export const useInventoryState = () => {
     transactions,
     scanLogs,
     stats,
+    serverStatus,
+    gsheetState,
+    googleToken,
+    manualRefresh: fetchFromServer,
+    connectGoogleSheets,
+    disconnectGoogleSheets,
+    pushToGoogleSheets,
+    pullFromGoogleSheets,
+    toggleLiveSync,
     addProduct,
     updateProductMeta,
     updateVariant,

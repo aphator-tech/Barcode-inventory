@@ -37,6 +37,14 @@ export default function App() {
     transactions,
     scanLogs,
     stats,
+    serverStatus,
+    gsheetState,
+    manualRefresh,
+    connectGoogleSheets,
+    disconnectGoogleSheets,
+    pushToGoogleSheets,
+    pullFromGoogleSheets,
+    toggleLiveSync,
     addProduct,
     updateProductMeta,
     updateVariant,
@@ -50,11 +58,15 @@ export default function App() {
     resetDatabaseToDefaults
   } = useInventoryState();
 
-  // Load user's theme selection on boot
+  // Load user's theme selection on boot and maintain document element class List
   useEffect(() => {
     const cachedTheme = localStorage.getItem('barinv_darkmode');
     if (cachedTheme === 'true') {
       setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setDarkMode(false);
+      document.documentElement.classList.remove('dark');
     }
   }, []);
 
@@ -62,6 +74,11 @@ export default function App() {
     const nextVal = !darkMode;
     setDarkMode(nextVal);
     localStorage.setItem('barinv_darkmode', String(nextVal));
+    if (nextVal) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   };
 
   // Automated sync handler for other modules adding scans
@@ -238,6 +255,14 @@ export default function App() {
               transactions={transactions}
               scanLogs={scanLogs}
               stats={stats}
+              serverStatus={serverStatus}
+              gsheetState={gsheetState}
+              onConnectGoogleSheets={connectGoogleSheets}
+              onDisconnectGoogleSheets={disconnectGoogleSheets}
+              onPushToGoogleSheets={pushToGoogleSheets}
+              onPullFromGoogleSheets={pullFromGoogleSheets}
+              onToggleLiveSync={toggleLiveSync}
+              manualRefresh={manualRefresh}
               onAdjustStock={adjustStockDirectly}
               onUndoTransaction={undoTransaction}
               onResetDatabase={resetDatabaseToDefaults}

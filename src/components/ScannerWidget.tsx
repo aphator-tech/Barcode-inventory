@@ -248,7 +248,7 @@ export const ScannerWidget: React.FC<ScannerWidgetProps> = ({
             <div className="absolute inset-0 flex flex-col items-center justify-center p-8 bg-radial from-gray-900 to-gray-950">
               <div className="w-24 h-24 mb-6 rounded-full bg-teal-500/10 border border-teal-500/20 flex items-center justify-center animate-pulse">
                 <Barcode className="w-10 h-10 text-teal-400 stroke-1" />
-              </div>the
+              </div>
               
               <div className="max-w-md w-full bg-slate-900/40 backdrop-blur-md rounded-2xl border border-slate-800 p-5 space-y-4 shadow-xl">
                 <div className="relative">

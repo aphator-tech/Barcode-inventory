@@ -554,40 +554,40 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
             
             {/* Left box: Product Core Information */}
             <div className="space-y-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block border-b border-gray-50 pb-1.5">1. Base Apparel Identity</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block border-b border-slate-100 dark:border-slate-800 pb-1.5">1. Base Apparel Identity</span>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Clothing Product Name</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Clothing Product Name</label>
                   <input
                     type="text"
                     required
                     placeholder="Classic Denim Trucker"
                     value={newProdName}
                     onChange={(e) => setNewProdName(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Brand Slate</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Brand Slate</label>
                   <input
                     type="text"
                     required
                     placeholder="Nørse Thread"
                     value={newProdBrand}
                     onChange={(e) => setNewProdBrand(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Taxonomy Category</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Taxonomy Category</label>
                   <select
                     value={newProdCategory}
                     onChange={(e) => setNewProdCategory(e.target.value)}
-                    className="w-full text-xs px-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-hidden text-gray-700"
+                    className="w-full text-xs px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden font-medium"
                   >
                     <option value="Sweaters & Knitwear">Sweaters & Knitwear</option>
                     <option value="Pants & Trousers">Pants & Trousers</option>
@@ -599,11 +599,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Ideal Gender Target</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Ideal Gender Target</label>
                   <select
                     value={newProdGender}
                     onChange={(e) => setNewProdGender(e.target.value as any)}
-                    className="w-full text-xs px-3 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:outline-hidden text-gray-700"
+                    className="w-full text-xs px-3 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-hidden font-medium"
                   >
                     <option value="Unisex">Unisex</option>
                     <option value="Men">Men</option>
@@ -615,57 +615,57 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Primary Fabric Material</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Primary Fabric Material</label>
                   <input
                     type="text"
                     placeholder="e.g. 100% Selvedge Indigo"
                     value={newProdMaterial}
                     onChange={(e) => setNewProdMaterial(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Collection Season</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Collection Season</label>
                   <input
                     type="text"
                     placeholder="Fall/Winter 2026"
                     value={newProdSeason}
                     onChange={(e) => setNewProdSeason(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-550">Image Display URL</label>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Image Display URL</label>
                 <input
                   type="text"
                   placeholder="https://images.unsplash.com/etc"
                   value={newProdImage}
                   onChange={(e) => setNewProdImage(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl font-mono text-gray-500"
+                  className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-gray-550">Extended Description</label>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Extended Description</label>
                 <textarea
                   placeholder="Apparel craftsmanship logs, yarn counts, pocket details..."
                   rows={3}
                   value={newProdDesc}
                   onChange={(e) => setNewProdDesc(e.target.value)}
-                  className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-gray-700 resize-none"
+                  className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 resize-none font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                 />
               </div>
             </div>
 
             {/* Right box: Variant Matrices attributes */}
             <div className="space-y-5">
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block border-b border-gray-50 pb-1.5">2. Attributes Vector Arrays</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block border-b border-slate-100 dark:border-slate-800 pb-1.5">2. Attributes Vector Arrays</span>
               
               {/* SIZE CREATOR CHIPS */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold text-gray-550 block">Include Sizes ({matrixSizes.length})</label>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">Include Sizes ({matrixSizes.length})</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -673,12 +673,12 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                     value={sizeInput}
                     onChange={(e) => setSizeInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSizeToMatrix())}
-                    className="text-xs px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl w-32 uppercase"
+                    className="text-xs px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-32 uppercase text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                   <button
                     type="button"
                     onClick={addSizeToMatrix}
-                    className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl"
+                    className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
                   >
                     Add Size
                   </button>
@@ -686,7 +686,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                 
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {matrixSizes.map(s => (
-                    <span key={s} className="px-2.5 py-1 bg-teal-50 text-teal-700 border border-teal-100 font-bold text-[10px] rounded-lg inline-flex items-center gap-1.5">
+                    <span key={s} className="px-2.5 py-1 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-400 border border-teal-100 dark:border-teal-900/40 font-bold text-[10px] rounded-lg inline-flex items-center gap-1.5">
                       {s}
                       <button type="button" onClick={() => removeSizeFromMatrix(s)} className="hover:text-rose-600 font-bold">✕</button>
                     </span>
@@ -696,14 +696,14 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
 
               {/* COLORS MATRIX CHIPS */}
               <div className="space-y-2 pt-1">
-                <label className="text-[11px] font-bold text-gray-550 block">Include Colors ({matrixColors.length})</label>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">Include Colors ({matrixColors.length})</label>
                 <div className="flex flex-wrap gap-2">
                   <input
                     type="text"
                     placeholder="Midnight Black"
                     value={colorNameInput}
                     onChange={(e) => setColorNameInput(e.target.value)}
-                    className="text-xs px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl w-40"
+                    className="text-xs px-3.5 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl w-40 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                   <input
                     type="color"
@@ -714,7 +714,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                   <button
                     type="button"
                     onClick={addColorToMatrix}
-                    className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl"
+                    className="px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
                   >
                     Add Color
                   </button>
@@ -722,45 +722,45 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
 
                 <div className="flex flex-wrap gap-2 pt-1.5">
                   {matrixColors.map(c => (
-                    <span key={c.name} className="px-2.5 py-1 bg-gray-50 border border-gray-150 rounded-lg text-[10px] font-bold inline-flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full border border-gray-200 inline-block" style={{ backgroundColor: c.hex }} />
+                    <span key={c.name} className="px-2.5 py-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] font-bold inline-flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                      <span className="w-2.5 h-2.5 rounded-full border border-slate-200/50 inline-block" style={{ backgroundColor: c.hex }} />
                       {c.name}
-                      <button type="button" onClick={() => removeColorFromMatrix(c.name)} className="hover:text-rose-650 font-bold">✕</button>
+                      <button type="button" onClick={() => removeColorFromMatrix(c.name)} className="hover:text-rose-600 font-bold">✕</button>
                     </span>
                   ))}
                 </div>
               </div>
 
-              <span className="text-xs font-bold uppercase tracking-wider text-gray-400 block border-b border-gray-50 pt-3 pb-1.5">3. Matrix Pricing & Global Allocation</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block border-b border-slate-100 dark:border-slate-800 pt-3 pb-1.5">3. Matrix Pricing & Global Allocation</span>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Initial Stock per Variant</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Initial Stock per Variant</label>
                   <input
                     type="number"
                     min="0"
                     required
                     value={initialStock}
                     onChange={(e) => setInitialStock(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl font-mono font-bold"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Min Alarms Threshold</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Min Alarms Threshold</label>
                   <input
                     type="number"
                     min="0"
                     required
                     value={minStockAlert}
                     onChange={(e) => setMinStockAlert(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl font-mono font-bold"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Vendor Wholesale Cost ($)</label>
+                   <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Vendor Wholesale Cost ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -768,11 +768,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                     required
                     value={purchasePrice}
                     onChange={(e) => setPurchasePrice(Math.max(0, parseFloat(e.target.value) || 0.00))}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl font-mono font-bold text-teal-650"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">MSRP Store Selling Price ($)</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">MSRP Store Selling Price ($)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -780,18 +780,18 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                     required
                     value={sellingPrice}
                     onChange={(e) => setSellingPrice(Math.max(0, parseFloat(e.target.value) || 0.00))}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl font-mono font-bold text-teal-650"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono font-bold text-teal-600 dark:text-teal-400 focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Default Manufacturer</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Default Manufacturer</label>
                   <select
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
-                    className="w-full text-xs py-2.5 px-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-hidden"
+                    className="w-full text-xs py-2.5 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-hidden font-medium text-slate-900 dark:text-slate-100"
                   >
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
@@ -799,13 +799,13 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-gray-550">Warehouse Slat Grid Location</label>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Warehouse Slat Grid Location</label>
                   <input
                     type="text"
                     placeholder="Aisle 1, Rack B-3"
                     value={storageLoc}
                     onChange={(e) => setStorageLoc(e.target.value)}
-                    className="w-full text-xs px-3.5 py-2.5 bg-gray-50/50 border border-gray-200 rounded-xl text-gray-650"
+                    className="w-full text-xs px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 font-medium focus:ring-2 focus:ring-teal-500 focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -814,9 +814,9 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
 
           </div>
 
-          <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
-            <div className="text-[11px] text-gray-400 font-medium">
-              Output Matrix Tally: <strong className="text-gray-700 font-bold">{matrixSizes.length * matrixColors.length} unique variants</strong> will be created.
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="text-[11px] text-slate-450 dark:text-slate-500 font-medium">
+              Output Matrix Tally: <strong className="text-slate-700 dark:text-slate-300 font-black">{matrixSizes.length * matrixColors.length} unique variants</strong> will be created.
             </div>
             <div className="flex gap-3">
               <button
@@ -1163,7 +1163,7 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({
 
             <button
               onClick={() => setLabelQueue(null)}
-              className="w-full text-center py-2 bg-gray-55 hover:bg-gray-100 text-gray-650 text-xs font-bold uppercase rounded-xl tracking-wider transition-all print:hidden"
+              className="w-full text-center py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold uppercase rounded-xl tracking-wider transition-all print:hidden border border-slate-200 dark:border-slate-700/50 cursor-pointer"
             >
               Flush Printer Buffer
             </button>

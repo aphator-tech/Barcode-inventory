@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { Product, Variant, Supplier, Transaction, ScanLog } from '../types';
 import { MetricCard } from './MetricCard';
+import { SheetsSyncManager } from './SheetsSyncManager';
 
 interface DashboardProps {
   id: string;
@@ -32,6 +33,14 @@ interface DashboardProps {
   transactions: Transaction[];
   scanLogs: ScanLog[];
   stats: any;
+  serverStatus: 'loading' | 'online' | 'local_fallback';
+  gsheetState: any;
+  onConnectGoogleSheets: (token: string) => void;
+  onDisconnectGoogleSheets: () => void;
+  onPushToGoogleSheets: () => void;
+  onPullFromGoogleSheets: () => void;
+  onToggleLiveSync: (enabled: boolean) => void;
+  manualRefresh: () => void;
   onAdjustStock: (variantId: string, diff: number, type: 'RESTOCK' | 'DAMAGED' | 'RETURN', note?: string) => void;
   onUndoTransaction: (id: string) => void;
   onResetDatabase: () => void;
@@ -45,6 +54,14 @@ export const DashboardView: React.FC<DashboardProps> = ({
   transactions,
   scanLogs,
   stats,
+  serverStatus,
+  gsheetState,
+  onConnectGoogleSheets,
+  onDisconnectGoogleSheets,
+  onPushToGoogleSheets,
+  onPullFromGoogleSheets,
+  onToggleLiveSync,
+  manualRefresh,
   onAdjustStock,
   onUndoTransaction,
   onResetDatabase
@@ -165,6 +182,19 @@ export const DashboardView: React.FC<DashboardProps> = ({
         />
       </div>
 
+      {/* ONLINE SYNC & GOOGLE SHEETS CONTROL MANAGER */}
+      <SheetsSyncManager
+        id="sheets-sync-manager-panel"
+        serverStatus={serverStatus}
+        gsheetState={gsheetState}
+        onConnect={onConnectGoogleSheets}
+        onDisconnect={onDisconnectGoogleSheets}
+        onPush={onPushToGoogleSheets}
+        onPull={onPullFromGoogleSheets}
+        onToggleLiveSync={onToggleLiveSync}
+        manualRefresh={manualRefresh}
+      />
+
       {/* 2. DUAL CHART & CATEGORIES SPLIT PANELS */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
@@ -209,7 +239,7 @@ export const DashboardView: React.FC<DashboardProps> = ({
                       x={p.x}
                       y={p.y - 12}
                       textAnchor="middle"
-                      className="text-[9px] font-bold font-mono fill-teal-650 filter drop-shadow-sm select-none"
+                      className="text-[9px] font-bold font-mono fill-teal-600 dark:fill-teal-400 filter drop-shadow-sm select-none"
                     >
                       ${p.value.toFixed(0)}
                     </text>
@@ -399,10 +429,10 @@ export const DashboardView: React.FC<DashboardProps> = ({
               {suppliers.map(sup => {
                 const variantsAssigned = variants.filter(v => v.supplierId === sup.id).length;
                 return (
-                  <div key={sup.id} className="p-3 bg-gray-50/50 rounded-2xl border border-gray-100/80 text-xs text-left text-gray-700 space-y-0.5">
-                    <strong className="block text-gray-950 font-bold truncate">{sup.name}</strong>
-                    <span className="text-[10px] text-gray-450 block truncate font-medium">Contact: {sup.contactName}</span>
-                    <span className="text-[9px] text-teal-650 font-bold tracking-wider uppercase block pt-1">
+                  <div key={sup.id} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-xs text-left text-slate-700 dark:text-slate-300 space-y-0.5">
+                    <strong className="block text-slate-950 dark:text-slate-100 font-bold truncate">{sup.name}</strong>
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate font-medium">Contact: {sup.contactName}</span>
+                    <span className="text-[9px] text-teal-600 dark:text-teal-400 font-extrabold tracking-wider uppercase block pt-1">
                       {variantsAssigned} Active variants
                     </span>
                   </div>
@@ -439,7 +469,7 @@ export const DashboardView: React.FC<DashboardProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={exportTransactionsCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 dark:bg-teal-950/30 hover:bg-teal-150 border border-teal-200/80 hover:text-white dark:hover:bg-teal-650 text-teal-700 dark:text-teal-400 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 dark:bg-teal-950/30 hover:bg-teal-600 border border-teal-200 hover:text-white dark:hover:bg-teal-600 text-teal-700 dark:text-teal-400 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer"
               title="Download entire transaction stream log as Excel CSV backup"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -500,7 +530,7 @@ export const DashboardView: React.FC<DashboardProps> = ({
                       </td>
 
                       {/* Items details breakdown lists */}
-                      <td className="py-3.5 max-w-sm truncate font-medium text-gray-650">
+                      <td className="py-3.5 max-w-sm truncate font-medium text-slate-600 dark:text-slate-450">
                         {tx.items.map((item, idx) => (
                           <div key={idx} className="block truncate">
                             {item.productName} ({item.variantDetails}) x{item.quantity}
