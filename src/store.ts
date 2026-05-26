@@ -380,10 +380,14 @@ export const useInventoryState = () => {
         }));
       } catch (err: any) {
         console.error('Auto-sync failed:', err);
+        const errMsg = err.message || '';
+        const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
+          ? 'Failed to fetch. Please verify that the Google Sheets and Google Drive APIs are enabled in your Cloud Console for the project "gen-lang-client-0290411644", and try reconnecting your account!'
+          : errMsg || 'Auto-sync failed. Please sign in again.';
         setGSheetState(prev => ({
           ...prev,
           isSyncing: false,
-          error: err.message || 'Auto-sync failed. Please sign in again.'
+          error: cleanErr
         }));
       }
     }
@@ -427,10 +431,14 @@ export const useInventoryState = () => {
 
     } catch (err: any) {
       console.error('Google Sheets connection failed:', err);
+      const errMsg = err.message || '';
+      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
+        ? 'Failed to fetch (API not enabled). Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for the project "gen-lang-client-0290411644", and then try signing in again!'
+        : errMsg || 'Connection or scope permission failed.';
       setGSheetState(prev => ({
         ...prev,
         isSyncing: false,
-        error: err.message || 'Connection or scope permission failed.'
+        error: cleanErr
       }));
       playScannerSound('error');
     }
@@ -477,10 +485,15 @@ export const useInventoryState = () => {
       }));
       playScannerSound('success');
     } catch (err: any) {
+      console.error('Push to Google Sheets failed:', err);
+      const errMsg = err.message || '';
+      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
+        ? 'Failed to fetch. Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for the project "gen-lang-client-0290411644".'
+        : errMsg || 'Push to Sheets failed.';
       setGSheetState(prev => ({
         ...prev,
         isSyncing: false,
-        error: err.message || 'Push to Sheets failed.'
+        error: cleanErr
       }));
       playScannerSound('error');
     }
@@ -515,10 +528,15 @@ export const useInventoryState = () => {
       }));
       playScannerSound('success');
     } catch (err: any) {
+      console.error('Pull from Google Sheets failed:', err);
+      const errMsg = err.message || '';
+      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
+        ? 'Failed to fetch. Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for project "gen-lang-client-0290411644".'
+        : errMsg || 'Failed pulling values from Google Sheets';
       setGSheetState(prev => ({
         ...prev,
         isSyncing: false,
-        error: err.message || 'Failed pulling values from Google Sheets'
+        error: cleanErr
       }));
       playScannerSound('error');
     }
