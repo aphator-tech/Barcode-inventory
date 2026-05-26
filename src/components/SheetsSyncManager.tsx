@@ -57,9 +57,11 @@ export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
 }) => {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [showSyncInfo, setShowSyncInfo] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const handleSignIn = async () => {
     setIsAuthorizing(true);
+    setAuthError(null);
     try {
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -70,13 +72,20 @@ export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
       }
     } catch (err: any) {
       console.error('Popup sign-in failed:', err);
-      alert(`Could not authorize Google Sheets: ${err.message || 'Please check popup settings.'}`);
+      if (err.code === 'auth/popup-closed-by-user' || err.message?.includes('popup-closed-by-user')) {
+        setAuthError(
+          'Google popup sign-in was closed or blocked. Because this preview window runs inside a security-sandboxed iframe, modern browsers restrict sign-in popups. Please open this app in a new tab using the button in the top-right of your preview or below to connect successfully!'
+        );
+      } else {
+        setAuthError(err.message || 'Could not authorize with Google. Please check your browser popup blocker settings.');
+      }
     } finally {
       setIsAuthorizing(false);
     }
   };
 
   const isConnected = !!gsheetState.spreadsheetId;
+  const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
 
   return (
     <div id={id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs relative overflow-hidden transition-all duration-200">
@@ -167,6 +176,49 @@ export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
                   </span>
                 </div>
               </button>
+
+              {/* ACTIVE POPUP ERROR DISPLAY */}
+              {authError && (
+                <div className="mt-4 p-3.5 bg-rose-50 dark:bg-rose-950/20 ring-1 ring-rose-200 dark:ring-rose-900/40 rounded-xl text-left flex items-start gap-2.5 max-w-sm">
+                  <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-rose-800 dark:text-rose-400">Authorization Hint</p>
+                    <p className="text-[11px] font-medium text-rose-700/90 dark:text-rose-300 leading-relaxed">
+                      {authError}
+                    </p>
+                    <div className="pt-2 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => {
+                          setAuthError(null);
+                          handleSignIn();
+                        }}
+                        className="px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-800 dark:text-slate-200 rounded-lg shadow-xs border border-slate-200 dark:border-slate-700 cursor-pointer"
+                      >
+                        Try Sign-In Again
+                      </button>
+                      <button
+                        onClick={() => {
+                          window.open(window.location.href, '_blank');
+                        }}
+                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-[10px] font-bold text-white rounded-lg shadow-xs cursor-pointer flex items-center gap-1"
+                      >
+                        Open App in New Tab
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* IFRAME PROACTIVE NOTICE */}
+              {isInsideIframe && !authError && (
+                <div className="mt-4 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-left flex items-start gap-2 max-w-sm">
+                  <AlertCircle className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
+                    <strong className="text-indigo-700 dark:text-indigo-400">Note for AI Studio Preview:</strong> For security, browsers disable popups in nested iframes. Please click <span className="underline font-bold cursor-pointer hover:text-indigo-800 dark:hover:text-indigo-300" onClick={() => window.open(window.location.href, '_blank')}>here to open in a new tab</span> so your Google auth popup works standardly!
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
