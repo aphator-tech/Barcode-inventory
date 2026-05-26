@@ -14,13 +14,44 @@ export interface GSheetConnectionState {
   liveSyncEnabled: boolean;
 }
 
+// Unified helper to route Google API calls through a local server-side proxy when running
+// in development/Cloud Run to prevent CORS preflight blocks in nested sandboxed/iframe previews.
+async function googleFetch(url: string, options: any = {}): Promise<Response> {
+  const isLocalOrCloudRun = typeof window !== 'undefined' && (
+    window.location.hostname.includes('localhost') || 
+    window.location.hostname.includes('.run.app')
+  );
+
+  if (isLocalOrCloudRun) {
+    try {
+      const proxyUrl = `/api/google-proxy?url=${encodeURIComponent(url)}`;
+      const proxyResponse = await fetch(proxyUrl, {
+        method: options.method || 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': options.headers?.['Authorization'] || options.headers?.['authorization'] || ''
+        },
+        body: options.body
+      });
+      
+      if (proxyResponse.status !== 404) {
+        return proxyResponse;
+      }
+    } catch (e) {
+      console.warn('Google Sheets API Proxy unavailable, falling back to direct fetch:', e);
+    }
+  }
+
+  return fetch(url, options);
+}
+
 // Helper to look up a spreadsheet by name in Google Drive
 export async function findNorseThreadSpreadsheet(accessToken: string): Promise<string | null> {
   const query = encodeURIComponent("name = 'Norse Thread Boutique Inventory & Logistics Control' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=files(id,name)`;
   
   try {
-    const res = await fetch(url, {
+    const res = await googleFetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -59,7 +90,7 @@ export async function createNorseThreadSpreadsheet(accessToken: string): Promise
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await googleFetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -92,7 +123,7 @@ export async function pushDataToGoogleSheets(
   const cleanAndWrite = async (sheetName: string, headers: string[], rows: any[][]) => {
     // 1. Clear the sheet first
     const clearUrl = `https://www.googleapis.com/sheets/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!A1:Z1000:clear`;
-    await fetch(clearUrl, {
+    await googleFetch(clearUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
@@ -105,7 +136,7 @@ export async function pushDataToGoogleSheets(
       values: [headers, ...rows]
     };
 
-    const writeRes = await fetch(writeUrl, {
+    const writeRes = await googleFetch(writeUrl, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -231,7 +262,7 @@ export async function pushDataToGoogleSheets(
     };
 
     // Attempt styling requests silently or log blockages (we won't crash if styling has non-matching sheet indices)
-    await fetch(styleUrl, {
+    await googleFetch(styleUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -254,7 +285,7 @@ export async function pullDataFromGoogleSheets(
 ): Promise<{ products: Product[]; variants: Variant[] }> {
   const getValues = async (sheetName: string, range: string): Promise<any[][]> => {
     const url = `https://www.googleapis.com/sheets/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetName)}!${range}`;
-    const res = await fetch(url, {
+    const res = await googleFetch(url, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
 
