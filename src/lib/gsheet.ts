@@ -15,14 +15,9 @@ export interface GSheetConnectionState {
 }
 
 // Unified helper to route Google API calls through a local server-side proxy when running
-// in development/Cloud Run to prevent CORS preflight blocks in nested sandboxed/iframe previews.
+// in the browser to prevent CORS preflight blocks in nested sandboxed/iframe previews and external deployments.
 async function googleFetch(url: string, options: any = {}): Promise<Response> {
-  const isLocalOrCloudRun = typeof window !== 'undefined' && (
-    window.location.hostname.includes('localhost') || 
-    window.location.hostname.includes('.run.app')
-  );
-
-  if (isLocalOrCloudRun) {
+  if (typeof window !== 'undefined') {
     try {
       const proxyUrl = `/api/google-proxy?url=${encodeURIComponent(url)}`;
       const proxyResponse = await fetch(proxyUrl, {
