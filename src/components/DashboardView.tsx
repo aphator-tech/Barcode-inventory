@@ -34,12 +34,10 @@ interface DashboardProps {
   scanLogs: ScanLog[];
   stats: any;
   serverStatus: 'loading' | 'online' | 'local_fallback';
-  gsheetState: any;
-  onConnectGoogleSheets: (token: string) => void;
-  onDisconnectGoogleSheets: () => void;
-  onPushToGoogleSheets: () => void;
-  onPullFromGoogleSheets: () => void;
-  onToggleLiveSync: (enabled: boolean) => void;
+  excelStatus: any;
+  onImportExcel: (parsedProds: Product[], parsedVars: Variant[], mode: 'merge' | 'overwrite', fileName: string) => void;
+  onExportExcel: () => void;
+  onDownloadTemplate: () => void;
   manualRefresh: () => void;
   onAdjustStock: (variantId: string, diff: number, type: 'RESTOCK' | 'DAMAGED' | 'RETURN', note?: string) => void;
   onUndoTransaction: (id: string) => void;
@@ -55,12 +53,10 @@ export const DashboardView: React.FC<DashboardProps> = ({
   scanLogs,
   stats,
   serverStatus,
-  gsheetState,
-  onConnectGoogleSheets,
-  onDisconnectGoogleSheets,
-  onPushToGoogleSheets,
-  onPullFromGoogleSheets,
-  onToggleLiveSync,
+  excelStatus,
+  onImportExcel,
+  onExportExcel,
+  onDownloadTemplate,
   manualRefresh,
   onAdjustStock,
   onUndoTransaction,
@@ -182,16 +178,17 @@ export const DashboardView: React.FC<DashboardProps> = ({
         />
       </div>
 
-      {/* ONLINE SYNC & GOOGLE SHEETS CONTROL MANAGER */}
+      {/* LOCAL OFFLINE EXCEL & SPREADSHEETS SYNC MANAGER */}
       <SheetsSyncManager
-        id="sheets-sync-manager-panel"
+        id="local-excel-manager-panel"
         serverStatus={serverStatus}
-        gsheetState={gsheetState}
-        onConnect={onConnectGoogleSheets}
-        onDisconnect={onDisconnectGoogleSheets}
-        onPush={onPushToGoogleSheets}
-        onPull={onPullFromGoogleSheets}
-        onToggleLiveSync={onToggleLiveSync}
+        excelStatus={excelStatus}
+        products={products}
+        variants={variants}
+        transactions={transactions}
+        onImportExcel={onImportExcel}
+        onExportExcel={onExportExcel}
+        onDownloadTemplate={onDownloadTemplate}
         manualRefresh={manualRefresh}
       />
 

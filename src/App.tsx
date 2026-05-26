@@ -38,13 +38,11 @@ export default function App() {
     scanLogs,
     stats,
     serverStatus,
-    gsheetState,
+    excelStatus,
     manualRefresh,
-    connectGoogleSheets,
-    disconnectGoogleSheets,
-    pushToGoogleSheets,
-    pullFromGoogleSheets,
-    toggleLiveSync,
+    importLocalExcelCatalog,
+    exportLocalExcelCatalog,
+    downloadTemplate,
     addProduct,
     updateProductMeta,
     updateVariant,
@@ -256,12 +254,10 @@ export default function App() {
               scanLogs={scanLogs}
               stats={stats}
               serverStatus={serverStatus}
-              gsheetState={gsheetState}
-              onConnectGoogleSheets={connectGoogleSheets}
-              onDisconnectGoogleSheets={disconnectGoogleSheets}
-              onPushToGoogleSheets={pushToGoogleSheets}
-              onPullFromGoogleSheets={pullFromGoogleSheets}
-              onToggleLiveSync={toggleLiveSync}
+              excelStatus={excelStatus}
+              onImportExcel={importLocalExcelCatalog}
+              onExportExcel={exportLocalExcelCatalog}
+              onDownloadTemplate={downloadTemplate}
               manualRefresh={manualRefresh}
               onAdjustStock={adjustStockDirectly}
               onUndoTransaction={undoTransaction}

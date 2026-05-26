@@ -133,52 +133,6 @@ async function startServer() {
     }
   });
 
-  // API - Google Sheets & Drive API Proxy to bypass Browser CORS sandbox restrictions
-  app.all('/api/google-proxy', async (req, res) => {
-    const targetUrl = req.query.url as string;
-    if (!targetUrl) {
-      return res.status(400).json({ error: 'Missing target url parameter' });
-    }
-
-    if (!targetUrl.startsWith('https://www.googleapis.com/')) {
-      return res.status(403).json({ error: 'Forbidden target domain. Only googleapis.com requests are proxied.' });
-    }
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'Missing authorization header' });
-    }
-
-    try {
-      const fetchOptions: any = {
-        method: req.method,
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json'
-        }
-      };
-
-      if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
-        fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      }
-
-      const googleRes = await fetch(targetUrl, fetchOptions);
-      res.status(googleRes.status);
-
-      const contentType = googleRes.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await googleRes.json();
-        res.json(data);
-      } else {
-        const text = await googleRes.text();
-        res.send(text);
-      }
-    } catch (err: any) {
-      console.error('[Google API Proxy Error]:', err);
-      res.status(500).json({ error: 'Google api proxy request failed', details: err.message });
-    }
-  });
-
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

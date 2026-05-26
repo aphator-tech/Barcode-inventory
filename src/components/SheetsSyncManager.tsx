@@ -3,135 +3,188 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  Cloud, 
-  CloudLightning, 
-  Database, 
   FileSpreadsheet, 
-  RefreshCw, 
-  ToggleLeft, 
-  ToggleRight, 
+  UploadCloud, 
+  Download, 
   CheckCircle, 
   AlertCircle, 
-  ExternalLink,
-  Lock,
-  User,
-  PowerOff
+  Trash2, 
+  Info,
+  Database,
+  Eye,
+  Settings,
+  ShieldCheck,
+  RefreshCw
 } from 'lucide-react';
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
-import { GSheetConnectionState } from '../lib/gsheet';
-
-// Safe initialization of Firebase Auth
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
-
-const provider = new GoogleAuthProvider();
-provider.addScope('https://www.googleapis.com/auth/spreadsheets');
-provider.addScope('https://www.googleapis.com/auth/drive.file');
+import { parseExcelFile } from '../lib/excel';
+import { Product, Variant, Transaction } from '../types';
 
 interface SheetsSyncManagerProps {
   id: string;
   serverStatus: 'loading' | 'online' | 'local_fallback';
-  gsheetState: GSheetConnectionState;
-  onConnect: (token: string) => void;
-  onDisconnect: () => void;
-  onPush: () => void;
-  onPull: () => void;
-  onToggleLiveSync: (enabled: boolean) => void;
+  excelStatus: {
+    lastImportedFileName: string | null;
+    lastImportedTimestamp: string | null;
+    successCountProducts: number;
+    successCountVariants: number;
+  } | null;
+  products: Product[];
+  variants: Variant[];
+  transactions: Transaction[];
+  onImportExcel: (parsedProds: Product[], parsedVars: Variant[], mode: 'merge' | 'overwrite', fileName: string) => void;
+  onExportExcel: () => void;
+  onDownloadTemplate: () => void;
   manualRefresh: () => void;
 }
 
 export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
   id,
   serverStatus,
-  gsheetState,
-  onConnect,
-  onDisconnect,
-  onPush,
-  onPull,
-  onToggleLiveSync,
+  excelStatus,
+  products,
+  variants,
+  transactions,
+  onImportExcel,
+  onExportExcel,
+  onDownloadTemplate,
   manualRefresh
 }) => {
-  const [isAuthorizing, setIsAuthorizing] = useState(false);
-  const [showSyncInfo, setShowSyncInfo] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [parsedData, setParsedData] = useState<{ products: Product[]; variants: Variant[]; sheetNames: string[] } | null>(null);
+  const [importMode, setImportMode] = useState<'merge' | 'overwrite'>('merge');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+  const [showConfigDetails, setShowConfigDetails] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSignIn = async () => {
-    setIsAuthorizing(true);
-    setAuthError(null);
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        onConnect(credential.accessToken);
-      } else {
-        throw new Error('Google authorization token not received.');
-      }
-    } catch (err: any) {
-      console.error('Popup sign-in failed:', err);
-      if (err.code === 'auth/popup-closed-by-user' || err.message?.includes('popup-closed-by-user')) {
-        setAuthError(
-          'Google popup sign-in was closed or blocked. Because this preview window runs inside a security-sandboxed iframe, modern browsers restrict sign-in popups. Please open this app in a new tab using the button in the top-right of your preview or below to connect successfully!'
-        );
-      } else {
-        setAuthError(err.message || 'Could not authorize with Google. Please check your browser popup blocker settings.');
-      }
-    } finally {
-      setIsAuthorizing(false);
+  // Drag handlers
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
     }
   };
 
-  const isConnected = !!gsheetState.spreadsheetId;
-  const isInsideIframe = typeof window !== 'undefined' && window.self !== window.top;
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value && e.target.files && e.target.files[0]) {
+      processFile(e.target.files[0]);
+    }
+  };
+
+  const processFile = async (file: File) => {
+    setSelectedFile(file);
+    setErrorMessage(null);
+    setParsedData(null);
+    setIsParsing(true);
+
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    if (!allowedTypes.includes(file.type) && fileExt !== 'xlsx' && fileExt !== 'xls' && fileExt !== 'csv') {
+      setErrorMessage("Unsupported file type. Please upload a standard Excel (.xlsx, .xls) or Comma Separated CSV (.csv) worksheet catalog.");
+      setIsParsing(false);
+      return;
+    }
+
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          if (event.target?.result instanceof ArrayBuffer) {
+            const parsed = parseExcelFile(event.target.result);
+            setParsedData(parsed);
+          } else {
+            throw new Error("Could not process file content.");
+          }
+        } catch (err: any) {
+          setErrorMessage(err.message || "Failed parsing the workbook. Make sure the file is not corrupted.");
+        } finally {
+          setIsParsing(false);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err) {
+      setErrorMessage("An unexpected error occurred during import.");
+      setIsParsing(false);
+    }
+  };
+
+  const handleApplyImport = () => {
+    if (!parsedData || !selectedFile) return;
+
+    if (parsedData.products.length === 0 && parsedData.variants.length === 0) {
+      setErrorMessage("No products or variants were found in the file. Ensure you are using the correct column structures.");
+      return;
+    }
+
+    onImportExcel(parsedData.products, parsedData.variants, importMode, selectedFile.name);
+    
+    // Reset uploader state
+    setSelectedFile(null);
+    setParsedData(null);
+  };
+
+  const handleDiscardUploaded = () => {
+    setSelectedFile(null);
+    setParsedData(null);
+    setErrorMessage(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <div id={id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xs relative overflow-hidden transition-all duration-200">
       
-      {/* Visual Accent */}
-      <div className="absolute top-0 left-0 w-full h-[3px] bg-linear-to-r from-teal-500 via-indigo-500 to-indigo-600" />
+      {/* Premium Visual Border */}
+      <div className="absolute top-0 left-0 w-full h-[3.5px] bg-gradient-to-r from-teal-500 via-emerald-500 to-teal-600" />
 
-      {/* HEADER SECTION */}
+      {/* HEADER ROW */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-5 mb-5 text-left">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl">
-            <Cloud className="w-5 h-5 animate-pulse" />
+          <div className="p-2.5 bg-teal-50 dark:bg-teal-950/40 text-teal-600 dark:text-teal-400 rounded-xl">
+            <FileSpreadsheet className="w-5 h-5" />
           </div>
           <div>
             <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-              Fully Online System & Live Backup
+              Local Spreadsheet Sync Console
             </h3>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Synchronize Boutique products across multiple devices with real-time Google Sheets database tracking.
+              Offline spreadsheet workbook parsing. Manage your entire product design catalog via local Excel and CSV files.
             </p>
           </div>
         </div>
 
-        {/* SERVER STATUS INDICATORS */}
+        {/* SERVER AND PERSISTENCE METADATA */}
         <div className="flex items-center gap-2">
-          {serverStatus === 'loading' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-yellow-50 dark:bg-yellow-950/30 text-[10px] font-bold text-yellow-700 dark:text-yellow-400 rounded-lg border border-yellow-100 dark:border-yellow-900/30">
-              <RefreshCw className="w-3 h-3 animate-spin" />
-              DB Connecting
-            </span>
-          )}
-          {serverStatus === 'online' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-teal-50 dark:bg-teal-950/40 text-[10px] font-black text-teal-700 dark:text-teal-400 rounded-lg border border-teal-100 dark:border-teal-900/40">
-              <span className="w-2 h-2 bg-teal-500 rounded-full animate-ping" />
-              Online Cloud Active
-            </span>
-          )}
-          {serverStatus === 'local_fallback' && (
-            <span className="flex items-center gap-1.5 px-3 py-1 bg-orange-50 dark:bg-orange-950/40 text-[10px] font-black text-orange-700 dark:text-orange-400 rounded-lg border border-orange-100 dark:border-orange-900/40">
-              <CloudLightning className="w-3 h-3 text-orange-500" />
-              Resilient Local Fallback
-            </span>
-          )}
+          <span className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-[10px] font-black text-emerald-700 dark:text-emerald-400 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+            100% Client Offline Secure
+          </span>
           <button 
             onClick={manualRefresh}
-            title="Reload from Cloud server"
+            title="Reload from local sqlite database files"
             className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-800 transition-all cursor-pointer"
           >
             <RefreshCw className="w-3 h-3" />
@@ -139,228 +192,187 @@ export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
         </div>
       </div>
 
-      {/* CORE SYNC LAYOUT */}
+      {/* DETAILED DOUBLE CONTAINER PANEL */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 text-left">
         
-        {/* LEFT THREE SPACES: CONTROL AND SHEETS DATA */}
-        <div className="lg:col-span-3 space-y-4">
-          {!isConnected ? (
-            <div className="rounded-xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/40 p-5 flex flex-col items-center justify-center text-center">
-              <Lock className="w-8 h-8 text-indigo-400 mb-3" />
-              <h4 className="text-xs font-black uppercase text-slate-700 dark:text-slate-350 tracking-wider">
-                Establish Google Google Account Connection
+        {/* LEFT COLUMN (3/5): FILE MANAGEMENT & ACTIONS */}
+        <div className="lg:col-span-3 space-y-5">
+          
+          {/* DRAG-AND-DROP SELECTOR */}
+          {!selectedFile ? (
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-200 ${
+                dragActive 
+                  ? 'border-teal-500 bg-teal-500/5 dark:bg-teal-900/10' 
+                  : 'border-slate-200 dark:border-slate-850 hover:border-teal-400 hover:bg-slate-50/50 dark:hover:bg-slate-950/20'
+              }`}
+            >
+              <input 
+                ref={fileInputRef}
+                type="file" 
+                onChange={handleFileInputChange}
+                accept=".xlsx,.xls,.csv"
+                className="hidden" 
+              />
+              <UploadCloud className="w-10 h-10 text-slate-350 dark:text-slate-650 mb-3" />
+              <h4 className="text-xs font-black uppercase text-slate-700 dark:text-slate-200 tracking-wider">
+                Select or Drop Spreadsheet File
               </h4>
-              <p className="text-xs text-slate-500 max-w-md my-2 leading-relaxed">
-                Unlock live dual-write backup pipelines. Once authorized, Norse Thread instantly provisions a professional spreadsheet inside your Drive.
+              <p className="text-[11px] text-slate-400 mt-1 max-w-sm leading-relaxed font-semibold">
+                Supports Excel workbooks (<span className="text-teal-600 font-extrabold">.xlsx</span>, <span className="text-teal-600 font-extrabold">.xls</span>) or Comma Separated (<span className="text-teal-600 font-extrabold">.csv</span>) spreadsheets.
               </p>
-
-              {/* gsi-material-button inspired style */}
-              <button 
-                onClick={handleSignIn}
-                disabled={isAuthorizing}
-                className="gsi-material-button mt-2 hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
-              >
-                <div className="gsi-material-button-state"></div>
-                <div className="gsi-material-button-content-wrapper">
-                  <div className="gsi-material-button-icon">
-                    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style={{ display: "block" }}>
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
-                      <path fill="none" d="M0 0h48v48H0z"></path>
-                    </svg>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-150 dark:border-slate-800 bg-slate-55/15 dark:bg-slate-950/40 p-5 space-y-4">
+              
+              {/* FILE BASIC INFO CARD */}
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-xl border border-teal-500/20">
+                    <FileSpreadsheet className="w-7 h-7" />
                   </div>
-                  <span className="gsi-material-button-contents font-semibold text-xs tracking-wide">
-                    {isAuthorizing ? 'Connecting App...' : 'Connect Google Sheets'}
-                  </span>
+                  <div>
+                    <h5 className="text-xs font-extrabold text-slate-800 dark:text-white truncate max-w-xs">{selectedFile.name}</h5>
+                    <p className="text-[10px] text-slate-400 font-mono">{(selectedFile.size / 1024).toFixed(1)} KB • Local Upload</p>
+                  </div>
                 </div>
-              </button>
+                
+                <button 
+                  onClick={handleDiscardUploaded}
+                  className="p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-lg transition-all"
+                  title="Discard file"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
 
-              {/* ACTIVE POPUP ERROR DISPLAY */}
-              {authError && (
-                <div className="mt-4 p-3.5 bg-rose-50 dark:bg-rose-950/20 ring-1 ring-rose-200 dark:ring-rose-900/40 rounded-xl text-left flex items-start gap-2.5 max-w-sm">
-                  <AlertCircle className="w-4 h-4 text-rose-500 dark:text-rose-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-xs font-bold text-rose-800 dark:text-rose-400">Authorization Hint</p>
-                    <p className="text-[11px] font-medium text-rose-700/90 dark:text-rose-300 leading-relaxed">
-                      {authError}
-                    </p>
-                    <div className="pt-2 flex flex-wrap gap-2">
+              {/* PARSED SUMMARY */}
+              {isParsing ? (
+                <div className="flex items-center gap-2 py-4">
+                  <RefreshCw className="w-4 h-4 text-teal-600 animate-spin" />
+                  <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Processing worksheets on-the-fly...</span>
+                </div>
+              ) : parsedData ? (
+                <div className="space-y-4 pt-1">
+                  
+                  {/* DATA METRIC PILLS */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2.5 flex flex-col justify-center">
+                      <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Products Parsed</span>
+                      <span className="text-sm font-black text-slate-800 dark:text-teal-400 mt-0.5">{parsedData.products.length} catalog items</span>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg p-2.5 flex flex-col justify-center">
+                      <span className="text-[9px] text-slate-400 uppercase font-black tracking-widest">Inventory Variants</span>
+                      <span className="text-sm font-black text-slate-800 dark:text-teal-400 mt-0.5">{parsedData.variants.length} color/sizes</span>
+                    </div>
+                  </div>
+
+                  {/* IMPORT MODE PICKER */}
+                  <div className="space-y-2 border-t border-slate-100 dark:border-slate-800/80 pt-3">
+                    <label className="text-[10px] font-black uppercase text-slate-450 dark:text-slate-350 tracking-wider">Choose Inventory Integration Policy</label>
+                    <div className="grid grid-cols-2 gap-2">
                       <button
-                        onClick={() => {
-                          setAuthError(null);
-                          handleSignIn();
-                        }}
-                        className="px-2.5 py-1 bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-800 dark:text-slate-200 rounded-lg shadow-xs border border-slate-200 dark:border-slate-700 cursor-pointer"
+                        onClick={() => setImportMode('merge')}
+                        className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${
+                          importMode === 'merge'
+                            ? 'border-emerald-500 bg-emerald-500/5 dark:bg-emerald-950/10 text-slate-800 dark:text-white'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900'
+                        }`}
                       >
-                        Try Sign-In Again
+                        <h6 className="text-[11px] font-black leading-tight uppercase">Merge Mode</h6>
+                        <p className="text-[9px] text-slate-450 leading-normal mt-0.5">Integrates rows into database, updating matches & appending new items.</p>
                       </button>
+                      
                       <button
                         onClick={() => {
-                          window.open(window.location.href, '_blank');
+                          const confirmOver = window.confirm("Are you positive you wish to overwrite the active catalog? This replaces all existing local items inside the boutique ledger.");
+                          if (confirmOver) setImportMode('overwrite');
                         }}
-                        className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-[10px] font-bold text-white rounded-lg shadow-xs cursor-pointer flex items-center gap-1"
+                        className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${
+                          importMode === 'overwrite'
+                            ? 'border-teal-500 bg-teal-500/5 dark:bg-teal-950/10 text-slate-800 dark:text-white'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-900'
+                        }`}
                       >
-                        Open App in New Tab
-                        <ExternalLink className="w-3 h-3" />
+                        <h6 className="text-[11px] font-black leading-tight uppercase">Overwrite Mode</h6>
+                        <p className="text-[9px] text-slate-450 leading-normal mt-0.5">Replaces current records completely with the contents of the upload.</p>
                       </button>
                     </div>
                   </div>
-                </div>
-              )}
 
-              {/* IFRAME PROACTIVE NOTICE */}
-              {isInsideIframe && !authError && (
-                <div className="mt-4 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 rounded-xl text-left flex items-start gap-2 max-w-sm">
-                  <AlertCircle className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed font-semibold">
-                    <strong className="text-indigo-700 dark:text-indigo-400">Note for AI Studio Preview:</strong> For security, browsers disable popups in nested iframes. Please click <span className="underline font-bold cursor-pointer hover:text-indigo-800 dark:hover:text-indigo-300" onClick={() => window.open(window.location.href, '_blank')}>here to open in a new tab</span> so your Google auth popup works standardly!
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              
-              {/* CONNECTED STATE SHEET INFO */}
-              <div className="rounded-xl border border-slate-100 dark:border-slate-800/80 bg-linear-to-b from-indigo-50/10 to-indigo-50/30 dark:from-slate-950/20 dark:to-slate-950/40 p-4 flex items-start gap-4">
-                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-xl">
-                  <FileSpreadsheet className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-xs font-black uppercase text-slate-800 dark:text-white tracking-wide">
-                      Real-time Google Sheet Live Setup
-                    </h4>
-                    <span className="px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-[9px] text-emerald-700 dark:text-emerald-400 font-extrabold rounded-md uppercase">
-                      Connected
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed truncate">
-                    Spreadsheet Name: <span className="font-bold text-indigo-700 dark:text-indigo-400">Norse Thread Boutique Inventory & Logistics Control</span>
-                  </p>
-                  
-                  {/* ACTIONS LINKS */}
-                  <div className="flex items-center gap-4 mt-3">
-                    <a 
-                      href={gsheetState.spreadsheetUrl || '#'} 
-                      target="_blank" 
-                      rel="referrer" 
-                      className="inline-flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold transition-all"
-                    >
-                      Open Backup Spreadsheet
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-
-                    <button 
-                      onClick={onDisconnect}
-                      className="inline-flex items-center gap-1.5 text-xs text-red-500 hover:text-red-700 font-bold transition-all cursor-pointer"
-                    >
-                      <PowerOff className="w-3.5 h-3.5" />
-                      Sign Out / Unlink
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* INTEGRATED TOGGLES & STATUS PANEL */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* LIVE DOCK TRACKING SWITCH */}
-                <div 
-                  onClick={() => onToggleLiveSync(!gsheetState.liveSyncEnabled)}
-                  className={`rounded-xl p-3 border transition-all duration-200 cursor-pointer flex items-center justify-between ${
-                    gsheetState.liveSyncEnabled 
-                      ? 'bg-emerald-500/15 border-emerald-500 dark:bg-emerald-950/10 dark:border-emerald-900' 
-                      : 'bg-slate-50/50 border-slate-200/50 dark:bg-slate-900 dark:border-slate-800'
-                  }`}
-                >
-                  <div className="text-left">
-                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-300">Live Auto-Backup Sync</h5>
-                    <p className="text-[10px] text-slate-500 mt-0.5 font-medium">Push updates instantly on sale or stock alterations</p>
-                  </div>
-                  <button className="text-indigo-600 dark:text-indigo-400 hover:scale-105 active:scale-95 transition-all">
-                    {gsheetState.liveSyncEnabled ? (
-                      <ToggleRight className="w-10 h-10 text-emerald-500" />
-                    ) : (
-                      <ToggleLeft className="w-10 h-10 text-slate-400" />
-                    )}
+                  {/* APPLY BUTTON */}
+                  <button
+                    onClick={handleApplyImport}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Apply Changes to Boutique Ledger
                   </button>
+
                 </div>
-
-                {/* LAST UPDATED COMPARTMENT */}
-                <div className="rounded-xl p-3 border border-slate-200 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/20 text-left">
-                  <h5 className="text-xs font-bold text-slate-900 dark:text-slate-300">Sync Telemetry Status</h5>
-                  <div className="flex items-center gap-2 mt-2">
-                    {gsheetState.isSyncing ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" />
-                        <span className="text-xs text-indigo-700 dark:text-indigo-400 font-bold">Uploading database...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                        <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-                          Last backup: <span className="font-extrabold text-slate-800 dark:text-slate-100">{gsheetState.lastSynced || 'Never'}</span>
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* MANUAL ACTION BAR PUSH / PULL */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={onPush}
-                  disabled={gsheetState.isSyncing}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${gsheetState.isSyncing ? 'animate-spin' : ''}`} />
-                  Push Live Backup Upstream
-                </button>
-                
-                <button
-                  onClick={() => {
-                    const confirmPull = window.confirm("Are you sure you want to pull data from Google Sheets? This will overwrite your local boutique database with values formatted in Sheets.");
-                    if (confirmPull) onPull();
-                  }}
-                  disabled={gsheetState.isSyncing}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-800 cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${gsheetState.isSyncing ? 'animate-spin' : ''}`} />
-                  Pull Updates Downstream
-                </button>
-              </div>
+              ) : null}
 
             </div>
           )}
 
-          {/* SPREADSHEET STRUCTURAL GUIDE ACCORDION */}
+          {/* TELEMETRY FEEDBACK LOG */}
+          {excelStatus && excelStatus.lastImportedFileName && (
+            <div className="p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-150 dark:border-slate-850/80 flex items-start justify-between text-left">
+              <div className="space-y-0.5">
+                <span className="text-[9px] text-teal-600 uppercase font-black tracking-widest block">Last Spreadsheet Event</span>
+                <p className="text-[11px] font-bold text-slate-800 dark:text-slate-150 truncate max-w-[200px] sm:max-w-xs">{excelStatus.lastImportedFileName}</p>
+                <div className="flex gap-3 text-[10px] text-slate-400 font-medium">
+                  <span>Imported at: {excelStatus.lastImportedTimestamp}</span>
+                  <span>Products: {excelStatus.successCountProducts}</span>
+                  <span>Variants: {excelStatus.successCountVariants}</span>
+                </div>
+              </div>
+              <span className="p-1 px-1.5 bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 font-extrabold text-[8px] uppercase tracking-wider rounded">Success</span>
+            </div>
+          )}
+
+          {/* MANUAL EXPORT BACKUP AND FORMAT RULES TRIGGER */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <button
+              onClick={onExportExcel}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Download Inventory Backup (.xlsx)
+            </button>
+            <button
+              onClick={onDownloadTemplate}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-200 dark:border-slate-800 cursor-pointer"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              Download Template (.xlsx)
+            </button>
+          </div>
+
+          {/* COLUMN DETAILS ACCORDION TRIGGER */}
           <div>
             <button 
-              onClick={() => setShowSyncInfo(!showSyncInfo)}
-              className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 select-none transition-all cursor-pointer font-bold uppercase tracking-wider"
+              onClick={() => setShowConfigDetails(!showConfigDetails)}
+              className="inline-flex items-center gap-1.5 text-[10px] text-slate-500 dark:text-slate-400 hover:text-teal-600 select-none transition-all cursor-pointer font-black uppercase tracking-wider"
             >
-              <span>{showSyncInfo ? 'Hide' : 'Reveal'} Spreadsheet Column Schema Structures</span>
-              <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1 rounded-sm">❔</span>
+              <span>{showConfigDetails ? 'Hide' : 'Reveal'} Local Spreadsheet Columns Mapping</span>
+              <Info className="w-3.5 h-3.5 text-slate-400" />
             </button>
-            
-            {showSyncInfo && (
-               <div className="mt-3 rounded-xl bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800 space-y-3.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+
+            {showConfigDetails && (
+              <div className="mt-3 rounded-xl bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800/80 space-y-3.5 text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-normal">
                 <div>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200 uppercase mb-1">Sheet 1: "Products Catalog"</p>
-                  <p>Tracks primary designs and meta boundaries. Fields: <span className="font-mono text-[11px] bg-white dark:bg-slate-900 border px-1 rounded-sm">Product ID, Name, Category, Brand, Gender, Material, Season, Created At</span>.</p>
+                  <p className="font-extrabold text-slate-800 dark:text-slate-200 uppercase mb-1">Products Catalog Tab</p>
+                  <p>Defines master apparel structures. Required column headers: <span className="font-mono text-[11px] bg-white dark:bg-slate-900 border px-1 rounded-sm">Product ID, Name, Category, Brand, Gender, Material, Season, Created At</span>.</p>
                 </div>
                 <div>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200 uppercase mb-1">Sheet 2: "Variants Inventory"</p>
-                  <p>Tracks active restocks and real-time barcodes. Fields: <span className="font-mono text-[11px] bg-white dark:bg-slate-900 border px-1 rounded-sm">Variant ID, Product ID, Size, Color Name, Color Hex, Barcode, SKU, Current Stock, Min Alert Level, Purchase Cost, Selling Price MSRP, Storage Location</span>.</p>
-                </div>
-                <div>
-                  <p className="font-extrabold text-slate-800 dark:text-slate-200 uppercase mb-1">Sheet 3: "Transaction History"</p>
-                  <p>Aggregates financial logs and audits of sales, restocks, and returns. Fields: <span className="font-mono text-[11px] bg-white dark:bg-slate-900 border px-1 rounded-sm">Timestamp, Transaction ID, Type, Subtotal, Discount, Tax, Grand Total, Payment Method, Items Summary, Notes</span>.</p>
+                  <p className="font-extrabold text-slate-800 dark:text-slate-200 uppercase mb-1">Variants Inventory Tab</p>
+                  <p>Defines restocks and sizing details. Required column headers: <span className="font-mono text-[11px] bg-white dark:bg-slate-900 border px-1 rounded-sm">Variant ID, Product ID, Size, Color Name, Color Hex, Barcode, SKU, Current Stock, Min Alert Level, Purchase Cost, Selling Price MSRP, Storage Location</span>.</p>
                 </div>
               </div>
             )}
@@ -368,50 +380,48 @@ export const SheetsSyncManager: React.FC<SheetsSyncManagerProps> = ({
 
         </div>
 
-        {/* RIGHT TWO SPACES: SYNC POLICY AND ADVANTAGES */}
-        <div className="lg:col-span-2 bg-slate-50/55 dark:bg-slate-950/20 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+        {/* RIGHT COLUMN (2/5): PRIVATE LOCAL PERSISTENCE BEST PRACTICES */}
+        <div className="lg:col-span-2 bg-slate-50/55 dark:bg-slate-950/25 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
           <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-            Synchronization Rules & Best Practices
+            Sandboxed Privacy & Best Practices
           </h4>
 
-          <ul className="space-y-3 text-xs text-slate-600 dark:text-slate-400 font-medium">
-            <li className="flex gap-2 items-start">
+          <ul className="space-y-3.5 text-xs text-slate-600 dark:text-slate-400 font-medium">
+            <li className="flex gap-2.5 items-start">
               <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>
-                <strong>Bidirectional Sync:</strong> Keep your Google Sheet browser tab open. Making modifications directly inside Sheets can be imported into Norse Thread with "Pull Updates".
+                <strong>No Cloud Latencies:</strong> By bypassing Google Authentication, Norse Thread achieves instant local syncing that runs fully inside your browser session.
               </span>
             </li>
-            <li className="flex gap-2 items-start">
-              <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+            <li className="flex gap-2.5 items-start">
+              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>
-                <strong>Excel Compatibility:</strong> Your backup Google Sheet can be instantly exported or downloaded as standard Excel (.xlsx) file format inside the Sheets Google interface.
+                <strong>Absolute Bank-Grade Privacy:</strong> Spreadsheets are evaluated offline on your sandbox container. No third-party servers or Google storage APIs receive your proprietary retail data.
               </span>
             </li>
-            <li className="flex gap-2 items-start">
-              <CheckCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+            <li className="flex gap-2.5 items-start">
+              <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
               <span>
-                <strong>Cloud Resiliency:</strong> Norse Thread handles offline disruptions flawlessly. If connection degrades, it stores updates locally then uploads them when Google Sheets is refreshed.
+                <strong>Persistent Database File:</strong> All imported sheets are written automatically to Node server files, preserving state safely through browser refreshes or cold reboots.
               </span>
             </li>
           </ul>
 
-          <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-start gap-2.5 text-[10px] text-slate-500 dark:text-slate-500">
-            <AlertCircle className="w-4 h-4 text-indigo-400 shrink-0" />
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-start gap-2.5 text-[10px] text-slate-400/90 font-medium">
+            <Info className="w-4 h-4 text-teal-500 shrink-0" />
             <p className="leading-relaxed">
-              Ensure you do not rename the Google Spreadsheet, rename sheets tab titles, or remove primary headers to avoid spreadsheet writing failures.
+              When configuring standard spreadsheet sheets, preserve column names exactly as outputted in the template file to ensure parsing matches database indexes correctly.
             </p>
           </div>
         </div>
 
       </div>
 
-      {/* ERROR OVERLAY PANEL IF ANY */}
-      {gsheetState.error && (
-        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/35 text-red-700 dark:text-red-400 rounded-xl flex items-center gap-2.5 text-xs">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <p className="font-semibold text-left">
-            Sync Guard Alert: {gsheetState.error}
-          </p>
+      {/* ERROR NOTICE FLOATING FOOTER */}
+      {errorMessage && (
+        <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-450 rounded-xl flex items-center gap-2.5 text-xs font-semibold">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
+          <p className="text-left leading-normal">{errorMessage}</p>
         </div>
       )}
 

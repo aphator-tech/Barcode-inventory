@@ -5,13 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Product, Variant, Supplier, TransactionType, Transaction, ScanLog, CartItem, InventoryStats } from './types';
-import { 
-  GSheetConnectionState, 
-  findNorseThreadSpreadsheet, 
-  createNorseThreadSpreadsheet, 
-  pushDataToGoogleSheets, 
-  pullDataFromGoogleSheets 
-} from './lib/gsheet';
+import { exportToExcel, parseExcelFile, downloadExcelTemplate } from './lib/excel';
 
 // Web Audio Synth for professional retail scanner sound effects
 export const playScannerSound = (type: 'success' | 'error' | 'click') => {
@@ -192,16 +186,22 @@ export const useInventoryState = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [scanLogs, setScanLogs] = useState<ScanLog[]>([]);
   
-  // Real-time server and sheet states
   const [serverStatus, setServerStatus] = useState<'loading' | 'online' | 'local_fallback'>('loading');
-  const [googleToken, setGoogleToken] = useState<string | null>(() => localStorage.getItem('barinv_google_token'));
-  const [gsheetState, setGSheetState] = useState<GSheetConnectionState>({
-    spreadsheetId: localStorage.getItem('barinv_spreadsheet_id'),
-    spreadsheetUrl: localStorage.getItem('barinv_spreadsheet_url'),
-    isSyncing: false,
-    lastSynced: localStorage.getItem('barinv_last_synced'),
-    error: null,
-    liveSyncEnabled: localStorage.getItem('barinv_gsheet_live') === 'true'
+  
+  // Local Excel State Tracking
+  const [excelStatus, setExcelStatus] = useState<{
+    lastImportedFileName: string | null;
+    lastImportedTimestamp: string | null;
+    successCountProducts: number;
+    successCountVariants: number;
+  }>(() => {
+    const raw = localStorage.getItem('barinv_excel_status');
+    return raw ? JSON.parse(raw) : {
+      lastImportedFileName: null,
+      lastImportedTimestamp: null,
+      successCountProducts: 0,
+      successCountVariants: 0
+    };
   });
 
   const [stats, setStats] = useState<InventoryStats>({
@@ -361,191 +361,64 @@ export const useInventoryState = () => {
       setServerStatus('local_fallback');
     }
 
-    // 3. Google Sheets Auto-Sync if logged in and configured
-    const activeToken = googleToken || localStorage.getItem('barinv_google_token');
-    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
-    const isLive = gsheetState.liveSyncEnabled || localStorage.getItem('barinv_gsheet_live') === 'true';
-
-    if (isLive && activeToken && sheetId) {
-      setGSheetState(prev => ({ ...prev, isSyncing: true }));
-      try {
-        await pushDataToGoogleSheets(activeToken, sheetId, prods, vars, trans);
-        const stamp = new Date().toLocaleTimeString();
-        localStorage.setItem('barinv_last_synced', stamp);
-        setGSheetState(prev => ({
-          ...prev,
-          isSyncing: false,
-          lastSynced: stamp,
-          error: null
-        }));
-      } catch (err: any) {
-        console.error('Auto-sync failed:', err);
-        const errMsg = err.message || '';
-        const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
-          ? 'Failed to fetch. Please verify that the Google Sheets and Google Drive APIs are enabled in your Cloud Console for the project "gen-lang-client-0290411644", and try reconnecting your account!'
-          : errMsg || 'Auto-sync failed. Please sign in again.';
-        setGSheetState(prev => ({
-          ...prev,
-          isSyncing: false,
-          error: cleanErr
-        }));
-      }
-    }
-  }, [googleToken, gsheetState.spreadsheetId, gsheetState.liveSyncEnabled]);
+  }, []);
 
 
-  // --- GOOGLE SHEETS ACTIONS ---
+  // --- LOCAL EXCEL ENGINE ACTIONS ---
 
-  const connectGoogleSheets = async (token: string) => {
-    setGoogleToken(token);
-    localStorage.setItem('barinv_google_token', token);
-    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
+  const importLocalExcelCatalog = (parsedProds: Product[], parsedVars: Variant[], mode: 'merge' | 'overwrite', fileName: string) => {
+    let nextProds = [...products];
+    let nextVars = [...variants];
 
-    try {
-      // Find or create sheet
-      let sheetId = await findNorseThreadSpreadsheet(token);
-      if (!sheetId) {
-        sheetId = await createNorseThreadSpreadsheet(token);
-      }
-
-      const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
-      localStorage.setItem('barinv_spreadsheet_id', sheetId);
-      localStorage.setItem('barinv_spreadsheet_url', sheetUrl);
-      
-      // Perform initial push config
-      await pushDataToGoogleSheets(token, sheetId, products, variants, transactions);
-      
-      const stamp = new Date().toLocaleTimeString();
-      localStorage.setItem('barinv_last_synced', stamp);
-
-      setGSheetState({
-        spreadsheetId: sheetId,
-        spreadsheetUrl: sheetUrl,
-        isSyncing: false,
-        lastSynced: stamp,
-        error: null,
-        liveSyncEnabled: true
+    if (mode === 'overwrite') {
+      nextProds = parsedProds;
+      nextVars = parsedVars;
+    } else {
+      // Merge products
+      parsedProds.forEach(importP => {
+        const idx = nextProds.findIndex(p => p.id === importP.id);
+        if (idx !== -1) {
+          nextProds[idx] = { ...nextProds[idx], ...importP };
+        } else {
+          nextProds.push(importP);
+        }
       });
-      localStorage.setItem('barinv_gsheet_live', 'true');
-      playScannerSound('success');
 
-    } catch (err: any) {
-      console.error('Google Sheets connection failed:', err);
-      const errMsg = err.message || '';
-      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
-        ? 'Failed to fetch (API not enabled). Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for the project "gen-lang-client-0290411644", and then try signing in again!'
-        : errMsg || 'Connection or scope permission failed.';
-      setGSheetState(prev => ({
-        ...prev,
-        isSyncing: false,
-        error: cleanErr
-      }));
-      playScannerSound('error');
+      // Merge variants
+      parsedVars.forEach(importV => {
+        const idx = nextVars.findIndex(v => v.id === importV.id || v.barcode === importV.barcode);
+        if (idx !== -1) {
+          nextVars[idx] = { ...nextVars[idx], ...importV };
+        } else {
+          nextVars.push(importV);
+        }
+      });
     }
+
+    setProducts(nextProds);
+    setVariants(nextVars);
+
+    const excelMeta = {
+      lastImportedFileName: fileName,
+      lastImportedTimestamp: new Date().toLocaleTimeString(),
+      successCountProducts: parsedProds.length,
+      successCountVariants: parsedVars.length
+    };
+    setExcelStatus(excelMeta);
+    localStorage.setItem('barinv_excel_status', JSON.stringify(excelMeta));
+
+    saveDataState(nextProds, nextVars, suppliers, transactions, scanLogs);
+    playScannerSound('success');
   };
 
-  const disconnectGoogleSheets = () => {
-    setGoogleToken(null);
-    localStorage.removeItem('barinv_google_token');
-    localStorage.removeItem('barinv_spreadsheet_id');
-    localStorage.removeItem('barinv_spreadsheet_url');
-    localStorage.removeItem('barinv_last_synced');
-    localStorage.removeItem('barinv_gsheet_live');
-
-    setGSheetState({
-      spreadsheetId: null,
-      spreadsheetUrl: null,
-      isSyncing: false,
-      lastSynced: null,
-      error: null,
-      liveSyncEnabled: false
-    });
-    playScannerSound('error');
+  const exportLocalExcelCatalog = () => {
+    exportToExcel(products, variants, transactions);
+    playScannerSound('success');
   };
 
-  const pushToGoogleSheets = async () => {
-    const token = googleToken || localStorage.getItem('barinv_google_token');
-    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
-    
-    if (!token || !sheetId) {
-      setGSheetState(prev => ({ ...prev, error: 'Authorization token or spreadsheet not connected.' }));
-      return;
-    }
-
-    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
-    try {
-      await pushDataToGoogleSheets(token, sheetId, products, variants, transactions);
-      const stamp = new Date().toLocaleTimeString();
-      localStorage.setItem('barinv_last_synced', stamp);
-      setGSheetState(prev => ({
-        ...prev,
-        isSyncing: false,
-        lastSynced: stamp,
-        error: null
-      }));
-      playScannerSound('success');
-    } catch (err: any) {
-      console.error('Push to Google Sheets failed:', err);
-      const errMsg = err.message || '';
-      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
-        ? 'Failed to fetch. Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for the project "gen-lang-client-0290411644".'
-        : errMsg || 'Push to Sheets failed.';
-      setGSheetState(prev => ({
-        ...prev,
-        isSyncing: false,
-        error: cleanErr
-      }));
-      playScannerSound('error');
-    }
-  };
-
-  const pullFromGoogleSheets = async () => {
-    const token = googleToken || localStorage.getItem('barinv_google_token');
-    const sheetId = gsheetState.spreadsheetId || localStorage.getItem('barinv_spreadsheet_id');
-
-    if (!token || !sheetId) {
-      setGSheetState(prev => ({ ...prev, error: 'Google Account Connection expired.' }));
-      return;
-    }
-
-    setGSheetState(prev => ({ ...prev, isSyncing: true, error: null }));
-    try {
-      const pulled = await pullDataFromGoogleSheets(token, sheetId, suppliers);
-      
-      // Update states
-      setProducts(pulled.products);
-      setVariants(pulled.variants);
-      
-      await saveDataState(pulled.products, pulled.variants, suppliers, transactions, scanLogs);
-
-      const stamp = new Date().toLocaleTimeString();
-      localStorage.setItem('barinv_last_synced', stamp);
-      setGSheetState(prev => ({
-        ...prev,
-        isSyncing: false,
-        lastSynced: stamp,
-        error: null
-      }));
-      playScannerSound('success');
-    } catch (err: any) {
-      console.error('Pull from Google Sheets failed:', err);
-      const errMsg = err.message || '';
-      const cleanErr = errMsg.includes('Failed to fetch') || errMsg.includes('fetch')
-        ? 'Failed to fetch. Please verify that both the Google Sheets API and Google Drive API are enabled in your Cloud Console for project "gen-lang-client-0290411644".'
-        : errMsg || 'Failed pulling values from Google Sheets';
-      setGSheetState(prev => ({
-        ...prev,
-        isSyncing: false,
-        error: cleanErr
-      }));
-      playScannerSound('error');
-    }
-  };
-
-  const toggleLiveSync = (enabled: boolean) => {
-    setGSheetState(prev => ({ ...prev, liveSyncEnabled: enabled }));
-    localStorage.setItem('barinv_gsheet_live', enabled ? 'true' : 'false');
-    playScannerSound('click');
+  const downloadTemplate = () => {
+    downloadExcelTemplate();
+    playScannerSound('success');
   };
 
 
@@ -920,14 +793,11 @@ export const useInventoryState = () => {
     scanLogs,
     stats,
     serverStatus,
-    gsheetState,
-    googleToken,
+    excelStatus,
+    importLocalExcelCatalog,
+    exportLocalExcelCatalog,
+    downloadTemplate,
     manualRefresh: fetchFromServer,
-    connectGoogleSheets,
-    disconnectGoogleSheets,
-    pushToGoogleSheets,
-    pullFromGoogleSheets,
-    toggleLiveSync,
     addProduct,
     updateProductMeta,
     updateVariant,
